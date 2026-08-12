@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard · PrediaBeat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-light: #818CF8;
+            --primary-dark: #3730A3;
+            --success: #10B981;
+            --success-light: #D1FAE5;
+            --danger: #EF4444;
+            --danger-light: #FEE2E2;
+            --warning: #F59E0B;
+            --bg: #F8FAFC;
+            --card: #FFFFFF;
+            --text: #1E293B;
+            --text-secondary: #64748B;
+            --border: #E2E8F0;
+            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .admin-wrapper {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        /* ── HEADER ── */
+        .admin-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .admin-header .icon-circle {
+            width: 52px; height: 52px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 22px;
+            box-shadow: 0 4px 14px rgba(79,70,229,0.3);
+        }
+        .admin-header h1 {
+            font-size: 26px; font-weight: 800;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+            background-clip: text;                    /* ← standar W3C */
+            -webkit-background-clip: text;            /* ← fallback Safari/Chrome lama */
+            -webkit-text-fill-color: transparent;     /* ← tidak ada standarnya, wajib -webkit */
+            color: transparent;                       /* ← fallback standar */
+        }
+        .admin-header p { font-size: 14px; color: var(--text-secondary); margin-top: 2px; }
+
+        /* ── ALERT / MESSAGE ── */
+        .alert {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 18px; border-radius: var(--radius);
+            margin-bottom: 24px; font-size: 14px; font-weight: 500;
+            animation: slideDown 0.4s ease;
+        }
+        .alert-success { background: var(--success-light); color: #065F46; border: 1px solid #A7F3D0; }
+        .alert i { font-size: 18px; }
+        @keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+
+        /* ── CARD ── */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 12px;
+        }
+        .card-header .card-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px;
+        }
+        .card-icon.upload { background: #EEF2FF; color: var(--primary); }
+        .card-icon.docs { background: #FEF3C7; color: var(--warning); }
+        .card-header h2 { font-size: 17px; font-weight: 700; }
+        .card-body { padding: 24px; }
+
+        /* ── UPLOAD ZONE ── */
+        .upload-zone {
+            border: 2px dashed #CBD5E1;
+            border-radius: var(--radius);
+            padding: 40px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            background: #FAFBFF;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary-light);
+            background: #EEF2FF;
+        }
+        .upload-zone.dragover {
+            border-color: var(--primary);
+            transform: scale(1.01);
+        }
+        .upload-zone .upload-icon {
+            font-size: 40px;
+            color: var(--primary-light);
+            margin-bottom: 12px;
+        }
+        .upload-zone h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+        .upload-zone p { font-size: 13px; color: var(--text-secondary); }
+        .upload-zone input[type="file"] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer;
+        }
+
+        .file-list {
+            margin-top: 16px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .file-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px;
+            background: #F1F5F9;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .file-item i { color: var(--primary); font-size: 16px; }
+        .file-item .file-name { flex: 1; font-weight: 500; }
+        .file-item .remove-file {
+            color: var(--danger); cursor: pointer; font-size: 14px;
+            background: none; border: none; padding: 4px;
+        }
+        .file-item .remove-file:hover { opacity: 0.7; }
+
+        .upload-actions {
+            display: flex; justify-content: flex-end; gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* ── BUTTONS ── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; border-radius: 8px;
+            font-size: 14px; font-weight: 600;
+            cursor: pointer; border: none;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(79,70,229,0.3);
+        }
+        .btn-primary:hover { box-shadow: 0 4px 14px rgba(79,70,229,0.4); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline {
+            background: transparent; color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .btn-outline:hover { background: #F8FAFC; }
+        .btn-sm { padding: 7px 14px; font-size: 13px; border-radius: 6px; }
+        .btn-info { background: #3B82F6; color: #fff; }
+        .btn-info:hover { background: #2563EB; }
+        .btn-danger { background: #EF4444; color: #fff; }
+        .btn-danger:hover { background: #DC2626; }
+        .btn-success { background: var(--success); color: #fff; }
+
+        /* ── TABLE ── */
+        .doc-table { width: 100%; border-collapse: collapse; }
+        .doc-table thead th {
+            background: #F8FAFC;
+            padding: 12px 16px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+        }
+        .doc-table thead th:last-child { text-align: center; }
+        .doc-table tbody tr {
+            transition: background 0.15s ease;
+        }
+        .doc-table tbody tr:hover { background: #F8FAFC; }
+        .doc-table tbody td {
+            padding: 14px 16px;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        .doc-table tbody td:last-child { text-align: center; }
+
+        .file-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 12px;
+            background: #F1F5F9;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .file-badge i { font-size: 16px; }
+        .file-badge .pdf { color: #EF4444; }
+        .file-badge .txt { color: #3B82F6; }
+        .file-badge .csv { color: var(--success); }
+
+        .action-group { display: flex; gap: 6px; justify-content: center; }
+
+        .empty-state {
+            text-align: center; padding: 48px 24px;
+        }
+        .empty-state i { font-size: 48px; color: #CBD5E1; margin-bottom: 12px; }
+        .empty-state h3 { font-size: 16px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+        .empty-state p { font-size: 13px; color: #94A3B8; }
+
+        .doc-count {
+            background: var(--primary);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 20px;
+            margin-left: 8px;
+        }
+
+        /* ── MODAL ── */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+        .modal-overlay.active { display: flex; align-items: flex-start; justify-content: center; padding-top: 5vh; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .modal-content {
+            background: var(--card);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            animation: slideUp 0.3s ease;
+            display: flex; flex-direction: column;
+        }
+        .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .modal-header h2 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .modal-close {
+            width: 36px; height: 36px;
+            border-radius: 8px; border: none;
+            background: #F1F5F9; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; color: var(--text-secondary);
+            transition: all 0.15s;
+        }
+        .modal-close:hover { background: #E2E8F0; color: var(--text); }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .section-title {
+            font-size: 14px; font-weight: 700;
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 12px; color: var(--text);
+        }
+        .section-title i { color: var(--primary); }
+
+        .chunk-box {
+            background: #F8FAFC;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 6px;
+        }
+        .chunk-label {
+            display: inline-block;
+            background: var(--primary);
+            color: #fff;
+            font-size: 11px; font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .qa-card {
+            background: #FFFBEB;
+            border: 1px solid #FDE68A;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .qa-card .qa-q {
+            font-weight: 700; font-size: 14px;
+            display: flex; gap: 8px; margin-bottom: 8px;
+        }
+        .qa-card .qa-q .qa-badge {
+            background: #3B82F6; color: #fff;
+            font-size: 11px; font-weight: 700;
+            padding: 2px 8px; border-radius: 4px;
+            white-space: nowrap;
+        }
+        .qa-card .qa-a {
+            font-size: 13px; color: #44403C; line-height: 1.6;
+            display: flex; gap: 8px;
+        }
+        .qa-card .qa-a .qa-badge {
+            background: var(--success); color: #fff;
+            font-size: 11px; font-weight: 700;
+            padding: 2px 8px; border-radius: 4px;
+            white-space: nowrap; height: fit-content;
+        }
+
+        .loading-state {
+            text-align: center; padding: 32px; color: var(--text-secondary);
+        }
+        .loading-state i { font-size: 28px; animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .error-text { color: var(--danger); }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 640px) {
+            .admin-wrapper { padding: 16px 12px; }
+            .admin-header h1 { font-size: 20px; }
+            .upload-zone { padding: 24px 16px; }
+            .doc-table thead th, .doc-table tbody td { padding: 10px 8px; font-size: 13px; }
+            .action-group { flex-direction: column; }
+        }
+    
+        .alert-error { background: var(--danger-light); color: #991B1B; border: 1px solid #FECACA; }
+        .section-gap { margin-bottom: 24px; }
+        .dataset-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+        .dataset-card { border: 1px solid var(--border); border-radius: 12px; padding: 18px; background: #FAFBFF; }
+        .dataset-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
+        .dataset-title-row h3 { font-size:15px; font-weight:800; margin:0; }
+        .dataset-description { font-size:12px; line-height:1.6; color:var(--text-secondary); margin-bottom:14px; }
+        .dataset-stats { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:14px; }
+        .dataset-stat { background:#fff; border:1px solid var(--border); border-radius:9px; padding:10px; }
+        .dataset-stat span { display:block; font-size:10px; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:.04em; }
+        .dataset-stat strong { display:block; margin-top:4px; font-size:14px; }
+        .dataset-actions { display:flex; flex-direction:column; gap:10px; }
+        .dataset-form { border-top:1px solid var(--border); padding-top:10px; }
+        .dataset-form label { display:block; font-size:12px; font-weight:700; margin-bottom:7px; }
+        .dataset-form-row { display:flex; gap:8px; align-items:center; }
+        .dataset-form input[type=file], .dataset-form select { min-width:0; flex:1; border:1px solid var(--border); border-radius:8px; padding:8px; background:#fff; font:inherit; font-size:12px; color:var(--text); }
+        .dataset-note { display:block; margin-top:6px; font-size:11px; color:var(--text-secondary); line-height:1.5; }
+        .status-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border-radius:999px; font-size:11px; font-weight:800; text-transform:capitalize; }
+        .status-badge.pending { background:#FEF3C7; color:#92400E; }
+        .status-badge.processing { background:#DBEAFE; color:#1D4ED8; }
+        .status-badge.completed { background:#D1FAE5; color:#065F46; }
+        .status-badge.failed { background:#FEE2E2; color:#991B1B; }
+        .status-badge.cancelled { background:#F1F5F9; color:#475569; }
+        .status-badge .dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+        .status-badge.processing .dot { animation:pulseStatus 1.2s ease-in-out infinite; }
+        @keyframes pulseStatus { 50% { opacity:.25; } }
+        .error-preview { max-width:220px; color:var(--danger); font-size:12px; line-height:1.4; }
+        .modal-status { display:none; padding:12px 14px; border-radius:10px; margin-bottom:16px; background:#F8FAFC; border:1px solid var(--border); font-size:13px; line-height:1.55; }
+        .modal-status strong { margin-right:6px; }
+        .validation-summary { display:none; margin-top:12px; padding:11px 13px; border-radius:9px; background:#FEF2F2; color:#991B1B; font-size:12px; line-height:1.6; border:1px solid #FECACA; }
+        .btn-warning { background:#F59E0B; color:#fff; }
+        .btn-warning:hover { background:#D97706; }
+        .btn-muted { background:#E2E8F0; color:#475569; }
+        .btn-xs { padding:7px 10px; font-size:12px; }
+        .mono-path { overflow-wrap:anywhere; font-family:monospace; font-size:10px; color:#94A3B8; margin-top:8px; }
+        @media (max-width: 850px) { .dataset-grid { grid-template-columns:1fr; } .doc-table { min-width:820px; } .card-body.table-body { overflow-x:auto; } }
+
+    .tab-btn {
+        flex: 1; padding: 10px 16px;
+        border: none; border-radius: 8px;
+        background: transparent; color: var(--text-secondary);
+        font-size: 14px; font-weight: 600; cursor: pointer;
+        font-family: inherit; transition: all 0.2s;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .tab-btn.active {
+        background: #fff; color: var(--primary);
+        box-shadow: var(--shadow);
+    }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    .chunk-accordion {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        overflow: hidden;
+        transition: all 0.2s;
+    }
+    .chunk-accordion:hover { border-color: #CBD5E1; }
+    .chunk-accordion-header {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 16px;
+        background: #F8FAFC;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.15s;
+    }
+    .chunk-accordion-header:hover { background: #F1F5F9; }
+    .chunk-accordion-header .chevron {
+        color: var(--text-secondary);
+        font-size: 12px;
+        transition: transform 0.2s;
+    }
+    .chunk-accordion-header.open .chevron { transform: rotate(90deg); }
+    .chunk-accordion-header .chunk-num {
+        background: var(--primary);
+        color: #fff; font-size: 11px; font-weight: 700;
+        padding: 3px 10px; border-radius: 6px;
+    }
+    .chunk-accordion-header .chunk-preview {
+        flex: 1; font-size: 13px; color: var(--text-secondary);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        max-width: 500px;
+    }
+    .chunk-accordion-body {
+        display: none;
+        padding: 16px;
+        border-top: 1px solid var(--border);
+        background: #FAFBFF;
+    }
+    .chunk-accordion-body.open { display: block; }
+    .chunk-text {
+        font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+        font-size: 12.5px; line-height: 1.8;
+        white-space: pre-wrap; word-break: break-word;
+    }
+
+    /* Format khusus data CSV makanan */
+    .food-field {
+        display: inline-block;
+        margin: 2px 4px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    .food-field.nama { background: #DBEAFE; color: #1E40AF; font-weight: 600; }
+    .food-field.kalori { background: #FEE2E2; color: #991B1B; font-weight: 600; }
+    .food-field.protein { background: #D1FAE5; color: #065F46; }
+    .food-field.karbo { background: #FEF3C7; color: #92400E; }
+    .food-field.lemak { background: #FCE7F3; color: #9D174D; }
+    .food-field.kategori { background: #E0E7FF; color: #3730A3; }
+    .food-field.kode { background: #F1F5F9; color: #64748B; }
+
+    .markdown-view { line-height:1.75; color:#334155; }
+    .markdown-view h1,.markdown-view h2,.markdown-view h3,.markdown-view h4 { color:var(--text); margin:20px 0 10px; line-height:1.3; }
+    .markdown-view h1 { font-size:24px; } .markdown-view h2 { font-size:20px; } .markdown-view h3 { font-size:17px; }
+    .markdown-view p { margin:10px 0; }
+    .markdown-view ul,.markdown-view ol { margin:10px 0 10px 24px; }
+    .markdown-view li { margin:5px 0; }
+    .markdown-view blockquote { margin:12px 0; padding:10px 14px; border-left:4px solid var(--primary-light); background:#EEF2FF; border-radius:0 8px 8px 0; }
+    .markdown-view pre { background:#0F172A; color:#E2E8F0; padding:14px; border-radius:9px; overflow:auto; margin:12px 0; }
+    .markdown-view code { font-family:Consolas,monospace; font-size:.92em; background:#F1F5F9; padding:2px 5px; border-radius:4px; }
+    .markdown-view pre code { background:transparent; padding:0; color:inherit; }
+    .markdown-table-wrap { overflow-x:auto; margin:14px 0; }
+    .markdown-view table { width:100%; border-collapse:collapse; font-size:13px; }
+    .markdown-view th,.markdown-view td { border:1px solid var(--border); padding:8px 10px; text-align:left; vertical-align:top; }
+    .markdown-view th { background:#F8FAFC; font-weight:700; }
+    .artifact-list { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+    .artifact-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid var(--border); border-radius:7px; background:#fff; color:var(--primary-dark); font-size:11px; font-weight:700; text-decoration:none; }
+    .artifact-chip:hover { background:#EEF2FF; border-color:#C7D2FE; }
+    .pagination-bar { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+    .pagination-info { min-width:170px; text-align:center; color:var(--text-secondary); font-size:12px; font-weight:600; }
+    .filter-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) 160px auto; gap:8px; margin-bottom:14px; }
+    .filter-toolbar input,.filter-toolbar select { border:1px solid var(--border); border-radius:8px; padding:10px 12px; font:inherit; font-size:13px; background:#fff; }
+    .layer-pill { display:inline-flex; padding:3px 8px; border-radius:999px; background:#E0E7FF; color:#3730A3; font-size:10px; font-weight:800; margin-left:auto; }
+    .artifact-path-box { padding:10px 12px; border-radius:8px; background:#F8FAFC; border:1px solid var(--border); color:var(--text-secondary); font:11px/1.5 Consolas,monospace; overflow-wrap:anywhere; margin-bottom:12px; }
+    @media (max-width:640px) { .filter-toolbar { grid-template-columns:1fr; } .pagination-info { min-width:0; } }
+
+</style>
+</head>
+<body>
+<div class="admin-wrapper">
+    <div class="admin-header">
+        <div class="icon-circle"><i class="fas fa-shield-halved"></i></div>
+        <div>
+            <h1>Admin Dashboard</h1>
+            <p>Manajemen basis pengetahuan PrediaBeat &mdash; Selamat datang, <strong>{{ user.username }}</strong></p>
+        </div>
+    </div>
+
+    {% if message %}
+    <div class="alert alert-success"><i class="fas fa-check-circle"></i><span>{{ message }}</span></div>
+    {% endif %}
+    {% if error %}
+    <div class="alert alert-error"><i class="fas fa-triangle-exclamation"></i><span>{{ error }}</span></div>
+    {% endif %}
+
+    <div class="card section-gap">
+        <div class="card-header">
+            <div class="card-icon upload"><i class="fas fa-table-list"></i></div>
+            <h2>Manajemen Dataset Referensi</h2>
+        </div>
+        <div class="card-body">
+            <div class="dataset-grid">
+            {% for dataset in datasets %}
+                <article class="dataset-card">
+                    <div class="dataset-title-row">
+                        <div>
+                            <h3>{{ dataset.label }}</h3>
+                            <span class="status-badge {{ 'completed' if dataset.exists else 'failed' }}"><span class="dot"></span>{{ 'Aktif' if dataset.exists else 'Belum tersedia' }}</span>
+                        </div>
+                        <i class="fas {{ 'fa-bowl-food' if dataset.key == 'food' else 'fa-leaf' }}" style="font-size:22px;color:var(--primary-light)"></i>
+                    </div>
+                    <p class="dataset-description">{{ dataset.description }}</p>
+                    <div class="dataset-stats">
+                        <div class="dataset-stat"><span>Baris</span><strong>{{ "{:,}".format(dataset.row_count) }}</strong></div>
+                        <div class="dataset-stat"><span>Kolom</span><strong>{{ dataset.column_count }}</strong></div>
+                        <div class="dataset-stat"><span>Ukuran</span><strong>{{ "%.2f"|format(dataset.size_bytes / 1024 / 1024) }} MB</strong></div>
+                    </div>
+                    <div class="dataset-actions">
+                        {% if dataset.key == 'food' %}
+                        <button type="button" class="btn btn-sm btn-info dataset-chunks-button"><i class="fas fa-layer-group"></i> Lihat Chunk CSV</button>
+                        {% endif %}
+                        <form class="dataset-form dataset-upload-form" method="post" enctype="multipart/form-data" action="/admin/datasets/{{ dataset.key }}/upload">
+                            <input type="hidden" name="return_to" value="/admin">
+                            <label><i class="fas fa-rotate"></i> Ganti Dataset Aktif</label>
+                            <div class="dataset-form-row">
+                                <input type="file" name="file" accept=".csv,text/csv" required {% if dataset.key == 'food' and food_reindex_active %}disabled{% endif %}>
+                                <button class="btn btn-sm btn-primary" type="submit" {% if dataset.key == 'food' and food_reindex_active %}disabled{% endif %}><i class="fas fa-upload"></i> Ganti</button>
+                            </div>
+                            <small class="dataset-note">File aktif lama otomatis disimpan sebagai backup. Backup tidak dibaca aplikasi dan tidak ikut direindex.</small>
+                        </form>
+
+                        {% set backups = dataset_backups.get(dataset.key, []) %}
+                        <form class="dataset-form restore-form" method="post" action="/admin/datasets/{{ dataset.key }}/restore">
+                            <input type="hidden" name="return_to" value="/admin">
+                            <label><i class="fas fa-clock-rotate-left"></i> Pulihkan Backup</label>
+                            <div class="dataset-form-row">
+                                <select name="backup_name" {% if not backups or (dataset.key == 'food' and food_reindex_active) %}disabled{% endif %} required>
+                                    {% if backups %}
+                                        {% for backup in backups %}<option value="{{ backup.name }}">{{ backup.name }}</option>{% endfor %}
+                                    {% else %}<option value="">Belum ada backup</option>{% endif %}
+                                </select>
+                                <button class="btn btn-sm btn-warning" type="submit" {% if not backups or (dataset.key == 'food' and food_reindex_active) %}disabled{% endif %}><i class="fas fa-rotate-left"></i> Pulihkan</button>
+                            </div>
+                            <small class="dataset-note">Saat dipulihkan, dataset aktif saat ini dibackup lebih dahulu.</small>
+                        </form>
+
+                        {% if dataset.rag_enabled %}
+                        <form class="dataset-form reindex-form" method="post" action="/admin/datasets/food/reindex">
+                            <input type="hidden" name="return_to" value="/admin">
+                            <button class="btn btn-sm btn-success reindex-button" type="submit" {% if not dataset.exists or food_reindex_active %}disabled{% endif %}>
+                                <i class="fas fa-arrows-rotate {{ 'fa-spin' if food_reindex_active else '' }}"></i>
+                                {% if food_reindex_active %}Reindex sedang {{ food_reindex_job.status }}{% else %}Reindex Vector Makanan{% endif %}
+                            </button>
+                            <small class="dataset-note">Vector lama dihapus berdasarkan source aktif, kemudian hanya CSV aktif yang diindex ulang.</small>
+                        </form>
+                        {% else %}
+                        <div class="dataset-note"><i class="fas fa-circle-info"></i> Dataset diet dibaca langsung dan tidak masuk collection makanan Qdrant.</div>
+                        {% endif %}
+                    </div>
+                    <div class="mono-path">{{ dataset.path }}</div>
+                </article>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card section-gap">
+        <div class="card-header">
+            <div class="card-icon upload"><i class="fas fa-cloud-arrow-up"></i></div>
+            <h2>Unggah Dokumen Baru</h2>
+        </div>
+        <div class="card-body">
+            <form id="uploadForm" action="/admin/documents/upload" method="post" enctype="multipart/form-data">
+                <div class="upload-zone" id="uploadZone">
+                    <input type="file" id="fileInput" name="files" accept=".pdf,application/pdf" multiple required>
+                    <div class="upload-icon"><i class="fas fa-cloud-arrow-up"></i></div>
+                    <h3>Drag & drop PDF di sini</h3>
+                    <p>atau klik untuk memilih &mdash; hanya PDF, maksimal 25 MB per file. Bila satu file bermasalah, seluruh upload dibatalkan.</p>
+                </div>
+                <div class="file-list" id="fileList"></div>
+                <div class="validation-summary" id="validationSummary"></div>
+                <div class="upload-actions" id="uploadActions" style="display:none;">
+                    <button type="button" class="btn btn-outline" id="clearFilesBtn"><i class="fas fa-xmark"></i> Batal</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn"><i class="fas fa-arrow-up-from-bracket"></i> Unggah Semua</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon docs"><i class="fas fa-database"></i></div>
+            <h2>Dokumen di Database (RAG)</h2>
+            {% if documents %}<span class="doc-count">{{ documents|length }}</span>{% endif %}
+        </div>
+        <div class="card-body table-body" style="padding:0;">
+            {% if documents %}
+            <table class="doc-table">
+                <thead><tr><th style="width:50px">#</th><th>Nama File</th><th>Status</th><th>Chunk</th><th>QA</th><th>Error</th><th style="width:210px;text-align:center">Aksi</th></tr></thead>
+                <tbody>
+                {% for document in documents %}
+                    <tr data-document-row="{{ document.source_id }}">
+                        <td style="color:var(--text-secondary);font-weight:600">{{ loop.index }}</td>
+                        <td><span class="file-badge"><i class="fas fa-file-pdf pdf"></i>{{ document.source_name }}</span></td>
+                        <td><span class="status-badge {{ document.status }}"><span class="dot"></span>
+                            {% if document.status == 'pending' %}Menunggu{% elif document.status == 'processing' %}Sedang diproses{% elif document.status == 'completed' %}Selesai{% elif document.status == 'failed' %}Gagal{% else %}{{ document.status }}{% endif %}
+                        </span></td>
+                        <td>{{ document.chunk_count }}</td><td>{{ document.qa_count }}</td>
+                        <td><div class="error-preview" title="{{ document.error_message or '' }}">{{ (document.error_message[:75] ~ '…') if document.error_message and document.error_message|length > 75 else (document.error_message or '-') }}</div></td>
+                        <td><div class="action-group">
+                            <button type="button" class="btn btn-sm btn-info detail-button" data-source-id="{{ document.source_id }}" data-source-name="{{ document.source_name }}"><i class="fas fa-eye"></i> Detail</button>
+                            <button type="button" class="btn btn-sm btn-danger delete-button" data-source-id="{{ document.source_id }}" data-source-name="{{ document.source_name }}" {% if document.status == 'processing' %}disabled title="Tunggu proses selesai"{% endif %}><i class="fas fa-trash-can"></i> Hapus</button>
+                        </div></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state"><i class="fas fa-folder-open"></i><h3>Belum ada dokumen</h3><p>Unggah PDF pertama Anda untuk membangun basis pengetahuan.</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="detailModal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-header">
+            <h2><i class="fas fa-file-lines" style="color:var(--primary)"></i> <span id="modalTitle">Detail Dokumen</span></h2>
+            <button type="button" class="modal-close" id="modalClose"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-status" id="modalStatus"></div>
+            <div id="statsBar" style="display:none;margin-bottom:20px">
+                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                    <div style="flex:1;min-width:140px;background:#EEF2FF;border-radius:10px;padding:14px 18px;text-align:center"><div style="font-size:24px;font-weight:800;color:var(--primary)" id="statChunks">0</div><div style="font-size:12px;color:var(--text-secondary);font-weight:600">Total Chunks</div></div>
+                    <div style="flex:1;min-width:140px;background:#FEF3C7;border-radius:10px;padding:14px 18px;text-align:center"><div style="font-size:24px;font-weight:800;color:#D97706" id="statQA">0</div><div style="font-size:12px;color:var(--text-secondary);font-weight:600">QA Pairs</div></div>
+                    <div style="flex:1;min-width:140px;background:#D1FAE5;border-radius:10px;padding:14px 18px;text-align:center"><div style="font-size:18px;font-weight:800;color:#059669" id="statSource">PDF + QA</div><div style="font-size:12px;color:var(--text-secondary);font-weight:600">Koleksi</div></div>
+                </div>
+                <div class="artifact-list" id="documentArtifactList"></div>
+            </div>
+            <div id="tabContainer" style="display:none;margin-bottom:20px"><div style="display:flex;gap:4px;background:#F1F5F9;border-radius:10px;padding:4px">
+                <button type="button" class="tab-btn active" data-doc-tab="markdown" id="tabMarkdown"><i class="fab fa-markdown"></i> Markdown</button>
+                <button type="button" class="tab-btn" data-doc-tab="chunks" id="tabChunks"><i class="fas fa-puzzle-piece"></i> Chunks</button>
+                <button type="button" class="tab-btn" data-doc-tab="qa" id="tabQA"><i class="fas fa-comments"></i> QA Pairs</button>
+            </div></div>
+            <div id="markdownPanel"><div class="section-title"><i class="fab fa-markdown"></i> Hasil Ekstraksi Markdown</div><div id="markdownContainer" class="markdown-view"><div class="loading-state"><i class="fas fa-spinner"></i><p>Memuat Markdown.</p></div></div></div>
+            <div id="chunksPanel" style="display:none"><div class="section-title"><i class="fas fa-puzzle-piece"></i> Hasil Chunking</div><div id="chunkContainer"><div class="loading-state"><i class="fas fa-spinner"></i><p>Memuat chunk.</p></div></div><div class="pagination-bar" id="chunkPagination" style="display:none"><button type="button" class="btn btn-outline btn-sm" id="chunkPrev"><i class="fas fa-chevron-left"></i> Sebelumnya</button><span class="pagination-info" id="chunkPageInfo"></span><button type="button" class="btn btn-outline btn-sm" id="chunkNext">Berikutnya <i class="fas fa-chevron-right"></i></button></div></div>
+            <div id="qaPanel" style="display:none"><div class="section-title"><i class="fas fa-comments"></i> Hasil QA Generation</div><div id="qaContainer"><div class="loading-state"><i class="fas fa-spinner"></i><p>Memuat QA.</p></div></div><div class="pagination-bar" id="qaPagination" style="display:none"><button type="button" class="btn btn-outline btn-sm" id="qaPrev"><i class="fas fa-chevron-left"></i> Sebelumnya</button><span class="pagination-info" id="qaPageInfo"></span><button type="button" class="btn btn-outline btn-sm" id="qaNext">Berikutnya <i class="fas fa-chevron-right"></i></button></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="datasetChunkModal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="datasetChunkTitle">
+        <div class="modal-header">
+            <h2><i class="fas fa-layer-group" style="color:var(--primary)"></i> <span id="datasetChunkTitle">Chunk Dataset Makanan</span></h2>
+            <button type="button" class="modal-close" id="datasetChunkClose"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <form class="filter-toolbar" id="foodChunkFilterForm">
+                <input type="search" id="foodChunkSearch" placeholder="Cari nama makanan, kode, kategori...">
+                <select id="foodChunkLayer"><option value="">Semua Layer</option><option value="0">Layer 0 · Makanan</option><option value="1">Layer 1 · Kelompok</option></select>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-magnifying-glass"></i> Cari</button>
+            </form>
+            <div class="artifact-path-box" id="foodArtifactPath">Folder artefak belum tersedia.</div>
+            <div class="artifact-list" id="foodArtifactList" style="margin-bottom:14px"></div>
+            <div id="foodChunkContainer"><div class="loading-state"><i class="fas fa-spinner"></i><p>Memuat chunk makanan.</p></div></div>
+            <div class="pagination-bar" id="foodPagination" style="display:none"><button type="button" class="btn btn-outline btn-sm" id="foodPrev"><i class="fas fa-chevron-left"></i> Sebelumnya</button><span class="pagination-info" id="foodPageInfo"></span><button type="button" class="btn btn-outline btn-sm" id="foodNext">Berikutnya <i class="fas fa-chevron-right"></i></button></div>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const MAX_PDF_BYTES = 25 * 1024 * 1024;
+    const PAGE_SIZE = 50;
+    const documentState = {sourceId:null, sourceName:'', chunkPage:1, qaPage:1, chunkPagination:null, qaPagination:null};
+    const foodState = {page:1, query:'', layer:'', pagination:null};
+
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const uploadActions = document.getElementById('uploadActions');
+    const validationSummary = document.getElementById('validationSummary');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function validateFiles(files) {
+        const errors = []; const names = new Set();
+        Array.from(files).forEach(file => {
+            const key = file.name.toLocaleLowerCase('id-ID');
+            if (!file.name.toLowerCase().endsWith('.pdf')) errors.push(`${file.name}: hanya PDF yang diperbolehkan.`);
+            if (file.size === 0) errors.push(`${file.name}: file kosong.`);
+            if (file.size > MAX_PDF_BYTES) errors.push(`${file.name}: ukuran maksimal 25 MB.`);
+            if (names.has(key)) errors.push(`${file.name}: nama duplikat dalam pilihan upload.`);
+            names.add(key);
+        });
+        return errors;
+    }
+
+    function renderFileList() {
+        fileList.replaceChildren();
+        const files = Array.from(fileInput.files || []); const errors = validateFiles(files);
+        files.forEach((file, index) => {
+            const item = document.createElement('div'); item.className = 'file-item';
+            const icon = document.createElement('i'); icon.className = 'fas fa-file-pdf'; icon.style.color = '#EF4444';
+            const name = document.createElement('span'); name.className = 'file-name'; name.textContent = file.name;
+            const size = document.createElement('span'); size.style.cssText = 'color:var(--text-secondary);font-size:12px'; size.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'remove-file'; remove.title = 'Hapus dari pilihan'; remove.innerHTML = '<i class="fas fa-xmark"></i>';
+            remove.addEventListener('click', () => removeFile(index)); item.append(icon, name, size, remove); fileList.appendChild(item);
+        });
+        uploadActions.style.display = files.length ? 'flex' : 'none'; validationSummary.style.display = errors.length ? 'block' : 'none'; validationSummary.replaceChildren();
+        if (errors.length) { const title = document.createElement('strong'); title.textContent = 'Upload belum bisa dilanjutkan:'; validationSummary.appendChild(title); errors.forEach(error => { const line = document.createElement('div'); line.textContent = `• ${error}`; validationSummary.appendChild(line); }); }
+        submitBtn.disabled = !files.length || Boolean(errors.length);
+    }
+    function removeFile(index) { const transfer = new DataTransfer(); Array.from(fileInput.files).forEach((file, position) => { if (position !== index) transfer.items.add(file); }); fileInput.files = transfer.files; renderFileList(); }
+    function clearFiles() { fileInput.value = ''; renderFileList(); }
+
+    uploadZone.addEventListener('dragover', event => { event.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', event => { event.preventDefault(); uploadZone.classList.remove('dragover'); const transfer = new DataTransfer(); Array.from(event.dataTransfer.files).forEach(file => transfer.items.add(file)); fileInput.files = transfer.files; renderFileList(); });
+    fileInput.addEventListener('change', renderFileList);
+    document.getElementById('clearFilesBtn').addEventListener('click', clearFiles);
+    document.getElementById('uploadForm').addEventListener('submit', event => { const errors = validateFiles(fileInput.files); if (errors.length || !fileInput.files.length) { event.preventDefault(); renderFileList(); return; } submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengunggah batch...'; });
+    document.querySelectorAll('.dataset-upload-form, .reindex-form').forEach(form => form.addEventListener('submit', () => { const button = form.querySelector('button[type="submit"]'); if (button) { button.disabled = true; button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...'; } }));
+    document.querySelectorAll('.restore-form').forEach(form => form.addEventListener('submit', event => { if (!confirm('Pulihkan backup ini sebagai dataset aktif? Dataset aktif sekarang akan dibackup terlebih dahulu.')) event.preventDefault(); }));
+
+    document.querySelectorAll('.detail-button').forEach(button => button.addEventListener('click', () => viewDetails(button.dataset.sourceId, button.dataset.sourceName)));
+    document.querySelectorAll('.delete-button').forEach(button => button.addEventListener('click', () => deleteDocument(button.dataset.sourceId, button.dataset.sourceName, button)));
+    document.querySelectorAll('.dataset-chunks-button').forEach(button => button.addEventListener('click', openFoodChunks));
+
+    async function deleteDocument(sourceId, sourceName, button) {
+        if (!confirm(`Hapus '${sourceName}' beserta PDF, seluruh chunk, seluruh QA, output, dan riwayat job?`)) return;
+        button.disabled = true; const original = button.innerHTML; button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menghapus...';
+        try { const response = await fetch(`/admin/document/${encodeURIComponent(sourceId)}`, {method:'DELETE'}); const result = await response.json(); if (!response.ok || !result.deleted) throw new Error(errorMessage(result, 'Gagal menghapus dokumen.')); const row = document.querySelector(`[data-document-row="${CSS.escape(sourceId)}"]`); if (row) { row.style.transition = 'all .3s ease'; row.style.opacity = '0'; row.style.transform = 'translateX(20px)'; } setTimeout(() => location.reload(), 350); }
+        catch (error) { alert(error.message); button.disabled = false; button.innerHTML = original; }
+    }
+
+    function viewDetails(sourceId, sourceName) { documentState.sourceId = sourceId; documentState.sourceName = sourceName; documentState.chunkPage = 1; documentState.qaPage = 1; openModal('detailModal'); document.getElementById('modalTitle').textContent = sourceName; resetDocumentModal(); loadDocumentDetail(); }
+    async function loadDocumentDetail() {
+        const params = new URLSearchParams({chunk_page:String(documentState.chunkPage), qa_page:String(documentState.qaPage), page_size:String(PAGE_SIZE)});
+        try {
+            const response = await fetch(`/admin/document/${encodeURIComponent(documentState.sourceId)}/details?${params}`); const data = await response.json();
+            if (!response.ok) throw new Error(errorMessage(data, 'Gagal memuat detail.'));
+            document.getElementById('statChunks').textContent = data.chunk_count ?? 0; document.getElementById('statQA').textContent = data.qa_count ?? 0;
+            document.getElementById('statsBar').style.display = 'block'; document.getElementById('tabContainer').style.display = 'block';
+            const status = document.getElementById('modalStatus'); status.style.display = 'block'; status.replaceChildren(); const strong = document.createElement('strong'); strong.textContent = 'Status:'; status.append(strong, document.createTextNode(` ${statusLabel(data.status)}`)); if (data.error_message) { const error = document.createElement('div'); error.className = 'error-text'; error.style.marginTop = '6px'; error.textContent = data.error_message; status.appendChild(error); }
+            const markdown = document.getElementById('markdownContainer'); markdown.innerHTML = data.extracted_html || '<div class="empty-state" style="padding:24px"><i class="fab fa-markdown" style="font-size:28px"></i><p>File extracted.md belum tersedia.</p></div>';
+            renderArtifactList('documentArtifactList', data.artifact_files || [], `/api/admin/documents/${encodeURIComponent(documentState.sourceId)}/artifacts/`);
+            documentState.chunkPagination = data.chunks_pagination; documentState.qaPagination = data.qa_pagination;
+            renderChunks(data.chunks || [], data.chunks_pagination); renderQA(data.qa_data || [], data.qa_pagination);
+        } catch (error) { document.getElementById('markdownContainer').innerHTML = `<p class="error-text"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(error.message)}</p>`; document.getElementById('chunkContainer').replaceChildren(); document.getElementById('qaContainer').replaceChildren(); }
+    }
+    function resetDocumentModal() { switchDocumentTab('markdown'); documentState.chunkPagination=null; documentState.qaPagination=null; document.getElementById('statsBar').style.display='none'; document.getElementById('tabContainer').style.display='none'; document.getElementById('modalStatus').style.display='none'; document.getElementById('chunkPagination').style.display='none'; document.getElementById('qaPagination').style.display='none'; document.getElementById('markdownContainer').innerHTML='<div class="loading-state"><i class="fas fa-spinner"></i><p>Memuat Markdown.</p></div>'; document.getElementById('chunkContainer').innerHTML='<div class="loading-state"><i class="fas fa-spinner"></i><p>Memuat chunk.</p></div>'; document.getElementById('qaContainer').innerHTML='<div class="loading-state"><i class="fas fa-spinner"></i><p>Memuat QA.</p></div>'; document.getElementById('documentArtifactList').replaceChildren(); }
+
+    function renderChunks(chunks, pagination) {
+        const container = document.getElementById('chunkContainer'); container.replaceChildren();
+        if (!chunks.length) { container.innerHTML='<div class="empty-state" style="padding:24px"><i class="fas fa-inbox" style="font-size:28px"></i><p>Tidak ada chunk pada halaman ini.</p></div>'; }
+        chunks.forEach((chunk,index) => appendChunkAccordion(container, chunk, ((pagination?.page || 1)-1)*PAGE_SIZE+index+1));
+        updatePagination('chunk', pagination);
+    }
+    function renderQA(items, pagination) {
+        const container = document.getElementById('qaContainer'); container.replaceChildren();
+        if (!items.length) { container.innerHTML='<div class="empty-state" style="padding:24px"><i class="fas fa-comments" style="font-size:28px"></i><p>Tidak ada QA pada halaman ini.</p></div>'; }
+        items.forEach((qa,index)=>{ const number=((pagination?.page||1)-1)*PAGE_SIZE+index+1; const card=document.createElement('div'); card.className='qa-card'; const q=document.createElement('div'); q.className='qa-q'; const qb=document.createElement('span'); qb.className='qa-badge'; qb.textContent=`Q${number}`; const qt=document.createElement('span'); qt.textContent=String(qa.question||''); q.append(qb,qt); const a=document.createElement('div'); a.className='qa-a'; const ab=document.createElement('span'); ab.className='qa-badge'; ab.textContent='A'; const at=document.createElement('span'); at.textContent=String(qa.answer||''); a.append(ab,at); card.append(q,a); container.appendChild(card); });
+        updatePagination('qa', pagination);
+    }
+    function appendChunkAccordion(container, chunk, number) {
+        const content=String(chunk.content||''); const preview=content.replace(/\s+/g,' ').slice(0,100)+(content.length>100?'…':''); const box=document.createElement('div'); box.className='chunk-accordion'; const header=document.createElement('div'); header.className='chunk-accordion-header'; const chevron=document.createElement('i'); chevron.className='fas fa-chevron-right chevron'; const num=document.createElement('span'); num.className='chunk-num'; num.textContent=`Chunk ${number}`; const previewEl=document.createElement('span'); previewEl.className='chunk-preview'; previewEl.textContent=preview; const layer=document.createElement('span'); layer.className='layer-pill'; layer.textContent=`Layer ${chunk.layer ?? '-'}`; const body=document.createElement('div'); body.className='chunk-accordion-body'; const text=document.createElement('div'); text.className='chunk-text'; text.textContent=content; body.appendChild(text); header.append(chevron,num,previewEl,layer); header.addEventListener('click',()=>{header.classList.toggle('open');body.classList.toggle('open');}); box.append(header,body); container.appendChild(box);
+    }
+    function updatePagination(prefix, pagination) { const bar=document.getElementById(`${prefix}Pagination`); if (!pagination) { bar.style.display='none'; return; } bar.style.display='flex'; document.getElementById(`${prefix}PageInfo`).textContent=`Halaman ${pagination.page} dari ${pagination.total_pages || 1} · ${pagination.total_items} data`; document.getElementById(`${prefix}Prev`).disabled=!pagination.has_previous; document.getElementById(`${prefix}Next`).disabled=!pagination.has_next; }
+    document.getElementById('chunkPrev').addEventListener('click',()=>{if(documentState.chunkPagination?.has_previous){documentState.chunkPage-=1;loadDocumentDetail();}}); document.getElementById('chunkNext').addEventListener('click',()=>{if(documentState.chunkPagination?.has_next){documentState.chunkPage+=1;loadDocumentDetail();}}); document.getElementById('qaPrev').addEventListener('click',()=>{if(documentState.qaPagination?.has_previous){documentState.qaPage-=1;loadDocumentDetail();}}); document.getElementById('qaNext').addEventListener('click',()=>{if(documentState.qaPagination?.has_next){documentState.qaPage+=1;loadDocumentDetail();}});
+    document.querySelectorAll('[data-doc-tab]').forEach(button=>button.addEventListener('click',()=>switchDocumentTab(button.dataset.docTab)));
+    function switchDocumentTab(tab) { const ids={markdown:'tabMarkdown',chunks:'tabChunks',qa:'tabQA'}; ['markdown','chunks','qa'].forEach(name=>{document.getElementById(ids[name]).classList.toggle('active',tab===name); document.getElementById(`${name}Panel`).style.display=tab===name?'block':'none';}); }
+
+    function openFoodChunks() { foodState.page=1; foodState.query=''; foodState.layer=''; document.getElementById('foodChunkSearch').value=''; document.getElementById('foodChunkLayer').value=''; openModal('datasetChunkModal'); loadFoodChunks(); }
+    async function loadFoodChunks() {
+        document.getElementById('foodChunkContainer').innerHTML='<div class="loading-state"><i class="fas fa-spinner"></i><p>Memuat chunk makanan.</p></div>';
+        const params=new URLSearchParams({page:String(foodState.page),page_size:String(PAGE_SIZE)}); if(foodState.query)params.set('query',foodState.query); if(foodState.layer!=='')params.set('layer',foodState.layer);
+        try { const response=await fetch(`/api/admin/datasets/food/chunks?${params}`); const data=await response.json(); if(!response.ok)throw new Error(errorMessage(data,'Gagal memuat chunk makanan.')); foodState.pagination=data.pagination; const container=document.getElementById('foodChunkContainer'); container.replaceChildren(); if(!(data.chunks||[]).length)container.innerHTML='<div class="empty-state" style="padding:24px"><i class="fas fa-magnifying-glass" style="font-size:28px"></i><p>Tidak ada chunk yang sesuai.</p></div>'; (data.chunks||[]).forEach((chunk,index)=>appendChunkAccordion(container,chunk,((data.pagination?.page||1)-1)*PAGE_SIZE+index+1)); document.getElementById('foodArtifactPath').textContent=`Folder hasil lengkap: ${data.output_path}`; renderArtifactList('foodArtifactList',data.artifact_files||[], '/api/admin/datasets/food/artifacts/'); updatePagination('food',data.pagination); }
+        catch(error){document.getElementById('foodPagination').style.display='none';document.getElementById('foodChunkContainer').innerHTML=`<p class="error-text"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(error.message)}</p>`;}
+    }
+    document.getElementById('foodChunkFilterForm').addEventListener('submit',event=>{event.preventDefault();foodState.query=document.getElementById('foodChunkSearch').value.trim();foodState.layer=document.getElementById('foodChunkLayer').value;foodState.page=1;loadFoodChunks();}); document.getElementById('foodPrev').addEventListener('click',()=>{if(foodState.pagination?.has_previous){foodState.page-=1;loadFoodChunks();}}); document.getElementById('foodNext').addEventListener('click',()=>{if(foodState.pagination?.has_next){foodState.page+=1;loadFoodChunks();}});
+
+    function renderArtifactList(containerId, files, baseUrl) { const container=document.getElementById(containerId); container.replaceChildren(); files.forEach(file=>{const link=document.createElement('a');link.className='artifact-chip';link.href=baseUrl+encodeURIComponent(file.name);link.target='_blank';link.rel='noopener';const icon=document.createElement('i');icon.className=file.name.endsWith('.json')?'fas fa-file-code':'fab fa-markdown';const label=document.createElement('span');label.textContent=`${file.name} · ${formatBytes(file.size_bytes)}`;link.append(icon,label);container.appendChild(link);}); }
+    function formatBytes(value){const bytes=Number(value||0);if(bytes<1024)return `${bytes} B`;if(bytes<1024*1024)return `${(bytes/1024).toFixed(1)} KB`;return `${(bytes/1024/1024).toFixed(2)} MB`;}
+    function openModal(id){const modal=document.getElementById(id);modal.classList.add('active');modal.setAttribute('aria-hidden','false');}
+    function closeModal(id){const modal=document.getElementById(id);modal.classList.remove('active');modal.setAttribute('aria-hidden','true');}
+    document.getElementById('modalClose').addEventListener('click',()=>closeModal('detailModal')); document.getElementById('datasetChunkClose').addEventListener('click',()=>closeModal('datasetChunkModal')); document.querySelectorAll('.modal-overlay').forEach(modal=>modal.addEventListener('click',event=>{if(event.target===event.currentTarget)closeModal(modal.id);})); document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeModal('detailModal');closeModal('datasetChunkModal');}});
+    function statusLabel(status){return({pending:'Menunggu',processing:'Sedang diproses',completed:'Selesai',failed:'Gagal',cancelled:'Dibatalkan'})[status]||status||'-';}
+    function errorMessage(payload,fallback){const detail=payload?.detail;if(typeof detail==='string')return detail;if(detail?.errors)return detail.errors.join('\n');if(detail?.message)return detail.message;return payload?.message||fallback;}
+    function escapeHtml(value){const div=document.createElement('div');div.textContent=String(value??'');return div.innerHTML;}
+
+    {% if active_jobs %}
+    setInterval(()=>{const anyModal=document.querySelector('.modal-overlay.active');if(!(fileInput.files&&fileInput.files.length)&&!anyModal)location.reload();},7000);
+    {% endif %}
+})();
+</script>
+</body>
+</html>

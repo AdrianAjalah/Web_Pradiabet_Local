@@ -1,0 +1,42 @@
+[
+  {
+    "category": "structured_food_lookup",
+    "question": "Berapa kalori Hoka hoka bento, Nasi putih per porsi pada dataset?"
+  },
+  {
+    "category": "structured_food_lookup",
+    "question": "Berapa kandungan gula ABC, saus sambal pada dataset?"
+  },
+  {
+    "category": "structured_food_lookup",
+    "question": "Berapa kandungan protein ABC, mackerel pada dataset?"
+  },
+  {
+    "category": "structured_compare",
+    "question": "Bandingkan kalori ABC, saus sambal dan ABC, kecap manis."
+  },
+  {
+    "category": "structured_compare",
+    "question": "Bandingkan kandungan gula ABC, saus sambal dan ABC, kecap manis."
+  },
+  {
+    "category": "structured_meal_total",
+    "question": "Jika saya makan 1 porsi ABC, mackerel dan 1 porsi Hoka hoka bento, Nasi putih, berapa total kalorinya?"
+  },
+  {
+    "category": "structured_meal_total",
+    "question": "Jika saya makan 2 porsi ABC, saus sambal dan 1 porsi Hoka hoka bento, Nasi putih, berapa total kalorinya?"
+  },
+  {
+    "category": "structured_filter",
+    "question": "Carikan makanan dengan gula maksimal 5 gram dan protein minimal 10 gram."
+  },
+  {
+    "category": "structured_recommend",
+    "question": "Rekomendasikan makanan tinggi protein dan rendah gula dari dataset PrediBeat."
+  },
+  {
+    "category": "structured_recommend",
+    "question": "Rekomendasikan makanan dari dataset PrediBeat yang rendah gula untuk membantu memilih makanan sehari-hari."
+  }
+]

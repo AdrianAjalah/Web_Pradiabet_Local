@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="min-h-[70vh] flex items-center justify-center px-4 py-16">
+    <div class="max-w-xl w-full bg-white border border-emerald-100 rounded-[2rem] shadow-xl shadow-emerald-500/10 p-8 text-center">
+        <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white grid place-items-center mx-auto mb-5 text-3xl shadow-lg shadow-emerald-500/20">
+            <i class="fas fa-screwdriver-wrench"></i>
+        </div>
+        <h1 class="text-3xl font-black text-slate-800">{{ feature_name }}</h1>
+        <p class="text-slate-500 font-semibold mt-3 leading-relaxed">Fitur ini akan disambungkan pada tahap berikutnya. Data akun, questionnaire, dan dashboard kamu sudah tetap aman.</p>
+        <a href="/dashboard" class="inline-flex items-center gap-2 mt-7 bg-slate-900 hover:bg-slate-800 text-white font-black px-6 py-3 rounded-2xl transition-all">
+            <i class="fas fa-arrow-left"></i> Kembali ke Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

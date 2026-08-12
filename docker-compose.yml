@@ -1,0 +1,103 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-predibeat}
+      POSTGRES_USER: ${POSTGRES_USER:-predibeat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-predibeat} -d ${POSTGRES_DB:-predibeat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-predibeat}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-predibeat}
+      RAG_INBOX_DIR: /app/data/rag/inbox
+      RAG_OUTPUT_DIR: /app/data/rag/output
+      RAG_PROCESSED_DIR: /app/data/rag/processed
+      RAG_FAILED_DIR: /app/data/rag/failed
+      FOOD_DATASET_PATH: /app/data/reference/food/master_makanan_kategori_flag_mealplan.csv
+      DIET_DATASET_PATH: /app/data/reference/diets/NutrinusaDatabase_InformationDiet.csv
+      ACTIVITY_DATASET_PATH: /app/data/reference/activities.csv
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Jakarta}
+      DATASET_BACKUP_DIR: /app/data/reference/backups
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - ./data/rag:/app/data/rag
+      - ./data/reference:/app/data/reference
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  rag-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.rag
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-predibeat}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-predibeat}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      RAG_INBOX_DIR: /app/data/rag/inbox
+      RAG_OUTPUT_DIR: /app/data/rag/output
+      RAG_PROCESSED_DIR: /app/data/rag/processed
+      RAG_FAILED_DIR: /app/data/rag/failed
+      FOOD_DATASET_PATH: /app/data/reference/food/master_makanan_kategori_flag_mealplan.csv
+      DIET_DATASET_PATH: /app/data/reference/diets/NutrinusaDatabase_InformationDiet.csv
+      ACTIVITY_DATASET_PATH: /app/data/reference/activities.csv
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Jakarta}
+      DATASET_BACKUP_DIR: /app/data/reference/backups
+      MINERU_BACKEND: pipeline
+      MINERU_METHOD: ${MINERU_METHOD:-auto}
+    volumes:
+      - ./data/rag:/app/data/rag
+      - ./data/reference:/app/data/reference
+      - mineru_home:/root
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  # Service sekali-jalan. Jalankan lebih dulu untuk mengunduh model MinerU
+  # ke volume, bukan memasukkannya ke layer image Docker.
+  mineru-models-download:
+    build:
+      context: .
+      dockerfile: Dockerfile.rag
+    profiles: ["setup"]
+    command: ["mineru-models-download", "-m", "pipeline", "-s", "huggingface"]
+    volumes:
+      - mineru_home:/root
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  mineru_home:

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    body { background: linear-gradient(135deg, #ecfdf5 0%, #f8fafc 100%); }
+</style>
+
+<div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+    <div class="absolute bottom-0 right-[-100px] w-96 h-96 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+</div>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+            <a href="/dashboard" class="text-sm font-bold text-emerald-700 hover:text-emerald-800">← Kembali ke Dashboard</a>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-slate-800 mt-3">Pilih Program Pola Makan</h1>
+            <p class="text-slate-500 mt-2 max-w-3xl">Mediterania dan Rendah Karbo mengatur pilihan makanan. Intermittent Fasting hanya mengatur jendela waktu makan dan dapat berjalan bersamaan dengan diet aktif.</p>
+        </div>
+        {% if active_diet %}
+        <form method="post" action="/api/deactivate-diet">
+            <button class="bg-white border border-rose-200 text-rose-600 px-5 py-2.5 rounded-xl font-bold hover:bg-rose-50 transition-all shadow-sm">
+                Matikan Diet Aktif
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-10">
+        <div class="bg-white/90 backdrop-blur rounded-2xl border border-slate-100 shadow-sm p-6">
+            <div class="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">Target Kalori Harian</div>
+            <div class="text-3xl font-extrabold text-emerald-700">{{ target_kalori }} <span class="text-base text-slate-500">kkal</span></div>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">Angka ini dihitung dari profil tubuh, aktivitas, BMI, dan risiko. Memilih program tidak menghapus target kalori ini.</p>
+        </div>
+
+        {% if recommendations %}
+        {% set top = recommendations[0] %}
+        <div class="lg:col-span-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl shadow-md p-6 text-white">
+            <div class="text-xs font-extrabold uppercase tracking-wider text-white/75 mb-2">Paling Direkomendasikan</div>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h2 class="text-2xl font-extrabold">{{ top.name }}</h2>
+                    <p class="text-sm text-white/90 mt-1">Skor kecocokan {{ top.score }}% berdasarkan data profil yang tersedia.</p>
+                </div>
+                <a href="/diet/{{ top.id | replace('_', '-') }}" class="inline-flex justify-center bg-white text-emerald-700 px-5 py-2.5 rounded-xl font-extrabold hover:bg-emerald-50 transition-all">Lihat Alasan</a>
+            </div>
+            {% if top.reasons %}
+            <p class="text-xs text-white/85 mt-4 leading-relaxed">{{ top.reasons[0] }}</p>
+            {% endif %}
+            {% if top.warning %}
+            <p class="text-xs bg-amber-100/20 border border-amber-100/30 rounded-xl p-3 mt-3">{{ top.warning }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {% for diet in diets %}
+        <div class="bg-white/90 backdrop-blur rounded-3xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-xl transition-all group {% if not diet.supported %}opacity-90{% endif %}">
+            <div class="relative h-56 bg-slate-100 overflow-hidden">
+                <img src="{{ diet.gambar }}" alt="{{ diet.nama }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.parentElement.innerHTML='<div class=\'absolute inset-0 flex items-center justify-center text-6xl\'>🥗</div>'">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent"></div>
+                <div class="absolute top-4 left-4 right-4 flex flex-wrap gap-2">
+                    {% if diet.is_active %}
+                    <span class="bg-emerald-500 text-white text-xs font-extrabold px-4 py-2 rounded-full shadow-lg">Sedang Aktif</span>
+                    {% endif %}
+                    {% if diet.is_recommended %}
+                    <span class="bg-amber-400 text-amber-950 text-xs font-extrabold px-4 py-2 rounded-full shadow-lg">Direkomendasikan</span>
+                    {% endif %}
+                    {% if not diet.supported %}
+                    <span class="bg-slate-800/90 text-white text-xs font-extrabold px-4 py-2 rounded-full shadow-lg">Coming Soon</span>
+                    {% endif %}
+                </div>
+                <h2 class="absolute bottom-5 left-6 right-6 text-2xl font-extrabold text-white drop-shadow">{{ diet.nama }}</h2>
+            </div>
+
+            <div class="p-7">
+                <p class="text-sm text-slate-600 leading-relaxed mb-5">{{ diet.ringkas }}</p>
+
+                <div class="{% if diet.supported %}bg-emerald-50/70 border-emerald-100{% else %}bg-slate-50 border-slate-200{% endif %} border rounded-2xl p-4 mb-4">
+                    <div class="text-xs font-extrabold uppercase tracking-wider {% if diet.supported %}text-emerald-700{% else %}text-slate-500{% endif %} mb-1">Efek ke sistem</div>
+                    <p class="text-xs text-slate-600 leading-relaxed">{{ diet.efek_makro }}</p>
+                </div>
+
+                {% if diet.recommendation and diet.supported %}
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <span class="text-xs font-extrabold text-slate-700">Kecocokan Profil</span>
+                        <span class="text-sm font-extrabold text-emerald-700">{{ diet.recommendation.score }}%</span>
+                    </div>
+                    <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-emerald-500 rounded-full" style="width: {{ diet.recommendation.score }}%"></div>
+                    </div>
+                    {% if diet.recommendation.warning %}
+                    <p class="text-xs text-amber-700 mt-3">{{ diet.recommendation.warning }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <a href="/diet/{{ diet.slug }}" class="flex-1 text-center bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-xl font-bold hover:border-emerald-400 hover:text-emerald-700 transition-all">Lihat Detail</a>
+
+                    {% if not diet.supported %}
+                    <button disabled class="flex-1 bg-slate-200 text-slate-500 px-5 py-3 rounded-xl font-bold cursor-not-allowed">Coming Soon</button>
+                    {% elif diet.program_type == 'time_pattern' %}
+                        {% if diet.is_active %}
+                        <form method="post" action="/api/deactivate-intermittent-fasting" class="flex-1">
+                            <button class="w-full bg-white border border-rose-200 text-rose-600 px-5 py-3 rounded-xl font-bold hover:bg-rose-50 transition-all">Matikan IF</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="/api/activate-intermittent-fasting" class="flex-1">
+                            <button class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all">Aktifkan 16:8</button>
+                        </form>
+                        {% endif %}
+                    {% else %}
+                    <form method="post" action="/api/activate-diet/{{ diet.slug }}" class="flex-1">
+                        <button class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-3 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-[1.01] transition-all">{% if diet.is_active %}Generate Ulang{% else %}Mulai Diet{% endif %}</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mt-10 bg-white/80 backdrop-blur rounded-2xl border border-slate-100 p-5 text-sm text-slate-500 leading-relaxed">
+        <b class="text-slate-700">Catatan:</b> Rekomendasi dibuat dari profil yang kamu isi dan tidak mengaktifkan program otomatis. Intermittent Fasting adalah pengaturan waktu makan, bukan perubahan komposisi makro. Program berlabel Coming Soon belum memengaruhi meal plan dan tidak dapat diaktifkan.
+    </div>
+</div>
+{% endblock %}

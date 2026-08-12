@@ -1,0 +1,6 @@
+-r requirements.txt
+huggingface_hub<1.0
+mineru[core]
+Pillow>=10.0,<13.0
+
+pypdf>=5.0,<7.0

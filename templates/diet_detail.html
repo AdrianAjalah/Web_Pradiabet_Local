@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    body { background: linear-gradient(135deg, #ecfdf5 0%, #f8fafc 100%); }
+</style>
+
+<div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+    <div class="absolute bottom-0 right-[-100px] w-96 h-96 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+</div>
+
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
+    <div class="mb-6 flex flex-col sm:flex-row justify-between gap-4">
+        <a href="/diet" class="text-sm font-bold text-emerald-700 hover:text-emerald-800">← Kembali ke Pilihan Program</a>
+        <a href="/dashboard" class="text-sm font-bold text-slate-500 hover:text-slate-700">Dashboard</a>
+    </div>
+
+    <div class="bg-white/90 backdrop-blur rounded-[2rem] overflow-hidden border border-slate-100 shadow-sm mb-8">
+        <div class="relative h-72 md:h-96 bg-slate-100 overflow-hidden">
+            <img src="{{ diet.gambar }}" alt="{{ diet.nama }}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\'absolute inset-0 flex items-center justify-center text-7xl\'>🥗</div>'">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+            <div class="absolute bottom-8 left-8 right-8">
+                <div class="flex flex-wrap gap-2 mb-3">
+                    {% if diet.is_active %}
+                    <span class="inline-block bg-emerald-500 text-white text-xs font-extrabold px-4 py-2 rounded-full shadow-lg">Sedang Aktif</span>
+                    {% endif %}
+                    {% if not diet.supported %}
+                    <span class="inline-block bg-slate-800 text-white text-xs font-extrabold px-4 py-2 rounded-full shadow-lg">Coming Soon</span>
+                    {% endif %}
+                </div>
+                <h1 class="text-3xl md:text-5xl font-extrabold text-white drop-shadow mb-3">{{ diet.nama }}</h1>
+                <p class="text-white/90 max-w-3xl leading-relaxed">{{ diet.ringkas }}</p>
+            </div>
+        </div>
+
+        <div class="p-7 md:p-10">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 space-y-8">
+                    <section>
+                        <h2 class="text-xl font-extrabold text-slate-800 mb-3">Program ini untuk apa?</h2>
+                        <p class="text-sm text-slate-600 leading-relaxed">{{ diet.untuk_apa }}</p>
+                    </section>
+
+                    <section>
+                        <h2 class="text-xl font-extrabold text-slate-800 mb-3">Prinsip utama</h2>
+                        <ul class="space-y-3">
+                            {% for item in diet.komposisi %}
+                            <li class="flex gap-3 text-sm text-slate-600 leading-relaxed">
+                                <span class="mt-0.5 text-emerald-500 font-bold">✓</span>
+                                <span>{{ item }}</span>
+                            </li>
+                            {% else %}
+                            <li class="text-sm text-slate-500">Informasi prinsip belum tersedia.</li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+
+                    <section class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-5">
+                            <h3 class="text-sm font-extrabold text-emerald-800 mb-3">Yang dianjurkan</h3>
+                            <div class="flex flex-wrap gap-2">
+                                {% for food in diet.dianjurkan %}
+                                <span class="bg-white border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg">{{ food }}</span>
+                                {% else %}<span class="text-xs text-emerald-700">Belum tersedia.</span>{% endfor %}
+                            </div>
+                        </div>
+                        <div class="bg-rose-50/70 border border-rose-100 rounded-2xl p-5">
+                            <h3 class="text-sm font-extrabold text-rose-800 mb-3">Yang dibatasi / dihindari</h3>
+                            <div class="flex flex-wrap gap-2">
+                                {% for food in diet.dibatasi %}
+                                <span class="bg-white border border-rose-200 text-rose-700 text-xs font-bold px-3 py-1.5 rounded-lg">{{ food }}</span>
+                                {% else %}<span class="text-xs text-rose-700">Belum tersedia.</span>{% endfor %}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <aside class="space-y-5">
+                    <div class="bg-emerald-50/80 border border-emerald-100 rounded-2xl p-5">
+                        <div class="text-xs font-extrabold uppercase tracking-wider text-emerald-700 mb-2">Target Kalori Kamu</div>
+                        <div class="text-2xl font-extrabold text-emerald-800">{{ target_kalori }} kkal/hari</div>
+                        <p class="text-xs text-emerald-700 mt-2">Target ini tetap menjadi dasar penyusunan meal plan.</p>
+                    </div>
+
+                    <div class="bg-slate-50/80 border border-slate-100 rounded-2xl p-5">
+                        <div class="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">Efek ke sistem</div>
+                        <p class="text-sm text-slate-600 leading-relaxed">{{ diet.efek_makro }}</p>
+                    </div>
+
+                    {% if recommendation and diet.supported %}
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5">
+                        <div class="flex items-center justify-between gap-2 mb-3">
+                            <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Kecocokan Profil</div>
+                            <div class="font-extrabold text-emerald-700">{{ recommendation.score }}%</div>
+                        </div>
+                        <ul class="space-y-2">
+                            {% for reason in recommendation.reasons %}
+                            <li class="text-xs text-slate-600 leading-relaxed flex gap-2"><span class="text-emerald-500">•</span><span>{{ reason }}</span></li>
+                            {% endfor %}
+                        </ul>
+                        {% if recommendation.warning %}
+                        <p class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3 mt-3">{{ recommendation.warning }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+                        <div class="text-xs font-extrabold uppercase tracking-wider text-amber-700 mb-2">Catatan</div>
+                        <p class="text-sm text-amber-700 leading-relaxed">{{ diet.catatan }}</p>
+                    </div>
+
+                    {% if not diet.supported %}
+                    <button disabled class="w-full bg-slate-200 text-slate-500 px-6 py-4 rounded-2xl font-extrabold cursor-not-allowed">Belum dapat diaktifkan · Coming Soon</button>
+                    {% elif diet.program_type == 'time_pattern' %}
+                        {% if diet.is_active %}
+                        <form method="post" action="/api/deactivate-intermittent-fasting">
+                            <button class="w-full bg-white border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl font-extrabold hover:bg-rose-50 transition-all">Matikan Intermittent Fasting</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="/api/activate-intermittent-fasting">
+                            <button class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-4 rounded-2xl font-extrabold shadow-md hover:shadow-lg transition-all">Aktifkan IF 16:8</button>
+                        </form>
+                        {% endif %}
+                    {% else %}
+                    <form method="post" action="/api/activate-diet/{{ diet.slug }}">
+                        <button class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-4 rounded-2xl font-extrabold shadow-md hover:shadow-lg hover:scale-[1.01] transition-all">{% if diet.is_active %}Generate Ulang Diet Ini{% else %}Mulai Diet Ini{% endif %}</button>
+                    </form>
+                    {% if diet.is_active %}
+                    <form method="post" action="/api/deactivate-diet">
+                        <button class="w-full bg-white border border-rose-200 text-rose-600 px-6 py-3 rounded-2xl font-bold hover:bg-rose-50 transition-all">Matikan Diet Aktif</button>
+                    </form>
+                    {% endif %}
+                    {% endif %}
+                </aside>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

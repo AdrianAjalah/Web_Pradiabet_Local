@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dataset Admin · PrediBeat</title>
+  <link rel="stylesheet" href="/static/admin/admin.css">
+</head>
+<body>
+  <main class="container">
+    {% if message %}<div class="notice success">{{ message }}</div>{% endif %}
+    {% if error %}<div class="notice error">{{ error }}</div>{% endif %}
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">PREDIBEAT V2</p>
+        <h1>Manajemen Dataset</h1>
+        <p class="subtitle">Lihat dan ganti dataset aktif. Dataset makanan dibaca langsung oleh structured retrieval; Qdrant hanya digunakan untuk dokumen PDF.</p>
+      </div>
+      <span class="warning">Login admin V1 belum dimigrasikan</span>
+    </header>
+
+    <section class="grid">
+      {% for dataset in datasets %}
+      <article class="card">
+        <div class="card-heading">
+          <div>
+            <span class="badge {{ 'ready' if dataset.exists else 'missing' }}">
+              {{ 'Aktif' if dataset.exists else 'Belum tersedia' }}
+            </span>
+            <h2>{{ dataset.label }}</h2>
+          </div>
+          <span class="dataset-key">{{ dataset.key }}</span>
+        </div>
+
+        <p>{{ dataset.description }}</p>
+
+        <dl class="stats">
+          <div><dt>Jumlah baris</dt><dd>{{ "{:,}".format(dataset.row_count) }}</dd></div>
+          <div><dt>Jumlah kolom</dt><dd>{{ dataset.column_count }}</dd></div>
+          <div><dt>Ukuran</dt><dd>{{ "%.2f"|format(dataset.size_bytes / 1024 / 1024) }} MB</dd></div>
+          <div><dt>Delimiter</dt><dd><code>{{ dataset.delimiter or '-' }}</code></dd></div>
+        </dl>
+
+        <div class="path"><strong>Lokasi:</strong><code>{{ dataset.path }}</code></div>
+
+        <details>
+          <summary>Lihat kolom</summary>
+          <p class="columns">{{ dataset.columns | join(', ') }}</p>
+        </details>
+
+        <form class="upload" method="post" enctype="multipart/form-data" action="/admin/datasets/{{ dataset.key }}/upload">
+          <input type="hidden" name="return_to" value="/admin/datasets">
+          <label>Ganti file CSV</label>
+          <div class="form-row">
+            <input type="file" name="file" accept=".csv,text/csv" required>
+            <button type="submit">Upload pengganti</button>
+          </div>
+          <small>File lama otomatis disalin ke <code>data/reference/backups</code>.</small>
+        </form>
+
+        {% set backups = dataset_backups.get(dataset.key, []) %}
+        <form class="upload restore-form" method="post" action="/admin/datasets/{{ dataset.key }}/restore">
+          <input type="hidden" name="return_to" value="/admin/datasets">
+          <label>Pulihkan Backup</label>
+          <div class="form-row">
+            <select name="backup_name" {% if not backups %}disabled{% endif %} required>
+              {% if backups %}
+                {% for backup in backups %}<option value="{{ backup.name }}">{{ backup.name }}</option>{% endfor %}
+              {% else %}<option value="">Belum ada backup</option>{% endif %}
+            </select>
+            <button type="submit" {% if not backups %}disabled{% endif %}>Pulihkan</button>
+          </div>
+          <small>Backup tidak dibaca aplikasi atau Qdrant. Dataset aktif sekarang dibackup sebelum pemulihan.</small>
+        </form>
+
+        {% if dataset.rag_enabled %}
+        <p><a href="/admin" style="display:inline-block;margin:8px 0;font-weight:700">Lihat chunk CSV (50 per halaman) di Dashboard Utama</a></p>
+        <form class="reindex-form" method="post" action="/admin/datasets/food/reindex">
+          <input type="hidden" name="return_to" value="/admin/datasets">
+          <button class="secondary reindex-button" type="submit" {% if not dataset.exists or food_reindex_active %}disabled{% endif %}>
+            {% if food_reindex_active %}Reindex sedang {{ food_reindex_job.status }}{% else %}Reindex ke Qdrant{% endif %}
+          </button>
+          <small>{% if food_reindex_active %}Job #{{ food_reindex_job.id }} sedang berjalan. Job duplikat tidak akan dibuat.{% else %}CSV diproses dua layer dengan BGE-M3 dan tidak dibuatkan QA.{% endif %}</small>
+        </form>
+        {% else %}
+        <div class="info">Dataset ini dibaca langsung oleh service diet dan tidak masuk Qdrant makanan.</div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </section>
+  </main>
+<script>
+document.querySelectorAll('.restore-form').forEach(form=>{form.addEventListener('submit',event=>{if(!confirm('Pulihkan backup ini sebagai dataset aktif?'))event.preventDefault();});});
+document.querySelectorAll('.reindex-form').forEach(form=>{form.addEventListener('submit',()=>{const button=form.querySelector('.reindex-button');if(button){button.disabled=true;button.textContent='Memasukkan antrean...';}});});
+</script>
+</body>
+</html>

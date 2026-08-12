@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    /* Mengubah warna background khusus untuk halaman Chatbot */
+    body {
+        background: linear-gradient(135deg, #ecfdf5 0%, #f8fafc 100%);
+    }
+
+    /* Styling khusus untuk merapikan hasil format Markdown dari AI */
+    .bot-content p { margin-bottom: 0.75rem; line-height: 1.6; }
+    .bot-content p:last-child { margin-bottom: 0; }
+    .bot-content ul, .bot-content ol { margin-top: 0.5rem; margin-bottom: 0.75rem; padding-left: 1.5rem; list-style-type: disc; }
+    .bot-content li { margin-bottom: 0.25rem; line-height: 1.5; }
+    .bot-content strong { color: #0f172a; font-weight: 800; }
+    
+    /* Custom Scrollbar untuk Chat History */
+    #chat-history::-webkit-scrollbar { width: 6px; }
+    #chat-history::-webkit-scrollbar-track { background: transparent; }
+    #chat-history::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    #chat-history::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>
+
+<!-- Ornamen Background Kaca Hiasan -->
+<div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+    <div class="absolute top-1/2 right-[-100px] w-80 h-80 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+</div>
+
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full h-[calc(100vh-80px)] flex flex-col relative z-10">
+
+    <!-- Header Chat -->
+    <div class="mb-6 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+            <i class="fas fa-robot text-2xl"></i>
+        </div>
+        <div>
+            <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">Konsultasi Dr. Predia AI</h2>
+            <p class="text-slate-500 font-medium text-sm mt-0.5">Tanyakan nutrisi, hitung konsumsi, rekomendasi menu, atau edukasi dari dokumen PDF.</p>
+        </div>
+    </div>
+
+    <!-- Container Chat Utama (Glassmorphism) -->
+    <div class="flex-grow flex flex-col bg-white/80 backdrop-blur-xl border border-white rounded-[2rem] shadow-[0_10px_40px_rgb(0,0,0,0.04)] overflow-hidden">
+        
+        <!-- Chat History Area -->
+        <div id="chat-history" class="flex-grow p-6 overflow-y-auto flex flex-col gap-6 bg-slate-50/30">
+            
+            <!-- Pesan Pembuka Bot -->
+            <div class="self-start flex gap-3 max-w-[85%] md:max-w-[75%]">
+                <img src="/static/logo.png" alt="Dr. Predia" class="w-8 h-8 rounded-full object-cover drop-shadow-sm flex-shrink-0" onerror="this.src='https://placehold.co/32x32/10b981/ffffff?text=AI'">
+                <div class="bg-white border border-slate-100 text-slate-700 px-5 py-4 rounded-2xl rounded-tl-none shadow-sm text-[15px] bot-content">
+                    <p>Halo <strong>{{ user.username }}</strong>! 👋</p>
+                    <p>Berdasarkan profil Anda, ada yang bisa saya bantu terkait menu makanan atau rutinitas olahraga hari ini?</p>
+                </div>
+            </div>
+
+        </div>
+        
+        <!-- Input Area -->
+        <div class="p-4 bg-white border-t border-slate-100/60">
+            <div class="flex items-end gap-3 relative">
+                <textarea id="chat-input" rows="1" placeholder="Ketik pertanyaan Anda di sini..." 
+                          class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-[15px] rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all resize-none overflow-hidden" 
+                          style="min-height: 56px; max-height: 120px;"></textarea>
+                
+                <button id="send-btn" class="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white h-[56px] w-[56px] rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 transition-transform transform hover:scale-105 hover:-translate-y-0.5">
+                    <i class="fas fa-paper-plane text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Library Marked.js untuk render Markdown -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<script>
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatHistory = document.getElementById('chat-history');
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value ?? '';
+        return div.innerHTML;
+    }
+
+    chatInput.addEventListener('input', function() {
+        this.style.height = '56px';
+        this.style.height = this.scrollHeight + 'px';
+    });
+
+    function actionCandidateOptions(group) {
+        return (group.candidates || []).map((food) => {
+            const selected = String(food.id) === String(group.selected_food_id) ? 'selected' : '';
+            const calories = Math.round(Number(food.kalori_kkal || 0));
+            return `<option value="${escapeHtml(food.id)}" ${selected}>${escapeHtml(food.nama)} — ${calories} kkal</option>`;
+        }).join('');
+    }
+
+    function renderActionCard(action) {
+        const cardId = `action-card-${action.id}`;
+        let groupsHtml = '';
+        if (action.type === 'add_food') {
+            groupsHtml = (action.groups || []).map((group, index) => `
+                <div class="food-action-group rounded-2xl border border-slate-200 bg-slate-50 p-3" data-group-index="${index}">
+                    <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Pilihan untuk “${escapeHtml(group.query)}”</label>
+                    <select class="food-candidate-select w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700">
+                        ${actionCandidateOptions(group)}
+                    </select>
+                    <div class="mt-3 flex items-center justify-between gap-3">
+                        <span class="text-xs font-bold text-slate-500">Jumlah porsi</span>
+                        <div class="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 p-1">
+                            <button type="button" class="action-quantity-minus w-8 h-8 rounded-lg bg-slate-100 font-black text-slate-700">−</button>
+                            <span class="action-quantity-value min-w-7 text-center font-black text-slate-800">${Number(group.quantity || 1)}</span>
+                            <button type="button" class="action-quantity-plus w-8 h-8 rounded-lg bg-emerald-500 font-black text-white">+</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        return `
+            <div id="${cardId}" data-action-id="${action.id}" class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0"><i class="fas fa-shield-alt"></i></div>
+                    <div class="flex-1">
+                        <h4 class="font-black text-slate-800">${escapeHtml(action.title || 'Konfirmasi Tindakan')}</h4>
+                        <p class="text-sm font-semibold text-slate-600 mt-1 leading-relaxed">${escapeHtml(action.message || '')}</p>
+                    </div>
+                </div>
+                <div class="action-groups mt-4 space-y-3">${groupsHtml}</div>
+                <div class="action-result hidden mt-4 rounded-xl p-3 text-sm font-bold"></div>
+                <div class="action-buttons mt-4 flex flex-wrap gap-2">
+                    <button type="button" class="confirm-action-btn px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black">Konfirmasi — ${escapeHtml(action.confirm_label || 'Jalankan')}</button>
+                    <button type="button" class="cancel-action-btn px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-black">Batal</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function initializeActionCard(action) {
+        const card = document.getElementById(`action-card-${action.id}`);
+        if (!card) return;
+        card.querySelectorAll('.food-action-group').forEach((group) => {
+            const value = group.querySelector('.action-quantity-value');
+            group.querySelector('.action-quantity-minus')?.addEventListener('click', () => {
+                value.textContent = String(Math.max(1, Number(value.textContent || 1) - 1));
+            });
+            group.querySelector('.action-quantity-plus')?.addEventListener('click', () => {
+                value.textContent = String(Math.min(20, Number(value.textContent || 1) + 1));
+            });
+        });
+        card.querySelector('.confirm-action-btn')?.addEventListener('click', () => confirmAction(action.id));
+        card.querySelector('.cancel-action-btn')?.addEventListener('click', () => cancelAction(action.id));
+    }
+
+    function actionSelections(card) {
+        return Array.from(card.querySelectorAll('.food-action-group')).map((group) => ({
+            group_index: Number(group.dataset.groupIndex),
+            food_id: group.querySelector('.food-candidate-select')?.value || '',
+            quantity: Number(group.querySelector('.action-quantity-value')?.textContent || 1),
+        }));
+    }
+
+    function showActionResult(card, message, success, hideControls = true) {
+        if (hideControls) {
+            card.querySelector('.action-buttons')?.classList.add('hidden');
+            card.querySelectorAll('select, button').forEach((el) => el.disabled = true);
+        }
+        const result = card.querySelector('.action-result');
+        result.classList.remove('hidden');
+        result.className = `action-result mt-4 rounded-xl p-3 text-sm font-bold ${success ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'}`;
+        result.textContent = message;
+    }
+
+    async function confirmAction(actionId) {
+        const card = document.getElementById(`action-card-${actionId}`);
+        if (!card) return;
+        const button = card.querySelector('.confirm-action-btn');
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Memproses...';
+        try {
+            const response = await fetch('/api/chatbot/actions/confirm', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action_id: actionId, selections: actionSelections(card)}),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'Tindakan gagal dijalankan.');
+            showActionResult(card, data.message || 'Tindakan berhasil dijalankan.', true);
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = 'Konfirmasi Ulang';
+            showActionResult(card, error.message || 'Tindakan gagal dijalankan.', false, false);
+        }
+    }
+
+    async function cancelAction(actionId) {
+        const card = document.getElementById(`action-card-${actionId}`);
+        if (!card) return;
+        try {
+            const response = await fetch('/api/chatbot/actions/cancel', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action_id: actionId}),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'Gagal membatalkan tindakan.');
+            showActionResult(card, data.message || 'Tindakan dibatalkan.', true);
+        } catch (error) {
+            showActionResult(card, error.message || 'Gagal membatalkan tindakan.', false);
+        }
+    }
+
+    async function sendMessage() {
+        const message = chatInput.value.trim();
+        if (!message) return;
+
+        chatHistory.insertAdjacentHTML('beforeend', `
+            <div class="self-end bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-3.5 rounded-2xl rounded-tr-none max-w-[85%] md:max-w-[75%] shadow-md text-[15px] leading-relaxed">
+                ${escapeHtml(message).replace(/\n/g, '<br>')}
+            </div>
+        `);
+        chatInput.value = '';
+        chatInput.style.height = '56px';
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+
+        const loadingId = 'loading-' + Date.now();
+        chatHistory.insertAdjacentHTML('beforeend', `
+            <div id="${loadingId}" class="self-start flex gap-3 max-w-[85%] md:max-w-[75%]">
+                <img src="/static/logo.png" alt="Dr. Predia" class="w-8 h-8 rounded-full object-cover opacity-70 flex-shrink-0" onerror="this.src='/static/WajahMaskot.png'">
+                <div class="bg-white border border-slate-100 text-slate-400 px-5 py-4 rounded-2xl rounded-tl-none shadow-sm text-[15px] italic flex items-center gap-2">
+                    <i class="fas fa-circle-notch fa-spin text-emerald-500"></i> Menganalisis data nutrisi...
+                </div>
+            </div>
+        `);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+
+        try {
+            const response = await fetch('/tanya', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({pertanyaan: message}),
+            });
+            const data = await response.json();
+            document.getElementById(loadingId)?.remove();
+            if (!response.ok) throw new Error(data.detail || 'Permintaan gagal.');
+
+            const actionHtml = data.action ? renderActionCard(data.action) : '';
+            chatHistory.insertAdjacentHTML('beforeend', `
+                <div class="self-start flex gap-3 max-w-[85%] md:max-w-[85%]">
+                    <img src="/static/logo.png" alt="Dr. Predia" class="w-8 h-8 rounded-full object-cover drop-shadow-sm flex-shrink-0 mt-1" onerror="this.src='/static/WajahMaskot.png'">
+                    <div class="bg-white border border-slate-100 text-slate-700 px-6 py-5 rounded-2xl rounded-tl-none shadow-sm text-[15px] bot-content">
+                        ${marked.parse(data.jawaban || '')}
+                        ${actionHtml}
+                        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            <i class="fas fa-book-medical"></i> Sumber: <span class="text-emerald-600">${escapeHtml(data.sumber || 'PrediBeat')}</span><span class="ml-2 text-slate-300">•</span><span class="ml-2 normal-case tracking-normal">${escapeHtml(data.mode === 'ollama' ? 'Ollama lokal' : data.mode === 'deterministic' ? 'Fallback terstruktur' : '')}</span>
+                        </div>
+                    </div>
+                </div>
+            `);
+            if (data.action) initializeActionCard(data.action);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        } catch (error) {
+            document.getElementById(loadingId)?.remove();
+            chatHistory.insertAdjacentHTML('beforeend', `
+                <div class="self-start flex gap-3 max-w-[85%] md:max-w-[75%]">
+                    <div class="w-8 h-8 rounded-full bg-red-100 text-red-500 flex items-center justify-center flex-shrink-0"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="bg-red-50 border border-red-100 text-red-700 px-5 py-4 rounded-2xl rounded-tl-none shadow-sm text-[15px]">${escapeHtml(error.message || 'Maaf, terjadi kesalahan koneksi.')}</div>
+                </div>
+            `);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+</script>
+{% endblock %}

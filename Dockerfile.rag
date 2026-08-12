@@ -1,0 +1,32 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HF_HOME=/root/.cache/huggingface
+
+WORKDIR /app
+
+# Library sistem yang umum diperlukan MinerU/OpenCV/PDF pipeline.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libgl1 \
+        libglib2.0-0 \
+        libgomp1 \
+        poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-rag.txt ./
+
+# Menyesuaikan instruksi instalasi MinerU yang dipilih pengguna.
+RUN pip uninstall -y magic-pdf huggingface_hub || true \
+    && pip install --upgrade pip \
+    && pip install "huggingface_hub<1.0" \
+    && pip install -r requirements-rag.txt
+
+COPY app ./app
+COPY worker ./worker
+COPY data ./data
+
+CMD ["python", "-m", "worker.rag_worker"]

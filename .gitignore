@@ -1,0 +1,46 @@
+# Environment & secrets
+.env
+
+# Python environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Local database
+*.db
+*.sqlite*
+
+# Logs
+logs/
+
+# IDE
+.idea/
+.vscode/
+
+# Runtime RAG
+data/rag/inbox/*
+data/rag/output/*
+data/rag/processed/*
+data/rag/failed/*
+
+!data/rag/inbox/.gitkeep
+!data/rag/output/.gitkeep
+!data/rag/processed/.gitkeep
+!data/rag/failed/.gitkeep
+
+# Runtime dataset backups
+data/reference/backups/*
+!data/reference/backups/.gitkeep
+
+# Generated benchmark results
+benchmark_results/*.csv
+benchmark_results/*_summary.json
