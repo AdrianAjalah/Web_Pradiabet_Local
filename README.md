@@ -2,6 +2,12 @@
 
 PrediBeat adalah aplikasi web FastAPI untuk assessment, meal plan, progress tracker, chatbot nutrisi, dan Hybrid RAG dokumen. Versi repository ini memakai model lokal melalui Ollama.
 
+## Buku panduan
+
+[**Unduh Manual Book PrediBeat (PDF)**](docs/manual-book-predibeat.pdf?raw=true)
+
+Panduan 9 halaman berisi cara menggunakan aplikasi dan chatbot, mengelola dokumen, memperbarui aplikasi melalui Docker, serta mengatasi kendala umum.
+
 ## Model AI
 
 - LLM: `llama3.1:8b` melalui Ollama.
