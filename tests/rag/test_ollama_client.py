@@ -1,4 +1,6 @@
 from app.rag.clients.ollama_client import OllamaHttpClient
+import pytest
+import json
 
 
 class FakeResponse:
@@ -23,6 +25,36 @@ class FakeSession:
         if url.endswith("/api/embed"):
             return FakeResponse({"embeddings": [[0.1, 0.2], [0.3, 0.4]]})
         return FakeResponse({"message": {"content": "jawaban"}})
+
+
+@pytest.mark.parametrize("complete", [True, False])
+def test_stream_requires_done_and_closes_response(complete):
+    class Response:
+        closed = False
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            self.closed = True
+        def raise_for_status(self):
+            pass
+        def iter_lines(self):
+            yield json.dumps({"message": {"content": "teks"}}).encode()
+            if complete:
+                yield b'{"done":true}'
+    response = Response()
+    class Session:
+        def post(self, *args, **kwargs):
+            assert kwargs["stream"] is True
+            assert kwargs["json"]["keep_alive"] == "10m"
+            return response
+    chunks = OllamaHttpClient("http://test", session=Session()).chat_stream("hi", "test")
+    assert next(chunks) == "teks"
+    if complete:
+        assert list(chunks) == []
+    else:
+        with pytest.raises(RuntimeError, match="terputus"):
+            next(chunks)
+    assert response.closed
 
 
 def test_embed_uses_bge_m3_batch_endpoint():

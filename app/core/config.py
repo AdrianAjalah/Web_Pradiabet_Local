@@ -45,6 +45,8 @@ class Settings:
     ollama_timeout_seconds: int = field(default_factory=lambda: _env_int("OLLAMA_TIMEOUT_SECONDS", 180))
     embedding_model: str = field(default_factory=lambda: _env("EMBEDDING_MODEL", "bge-m3"))
     qa_model: str = field(default_factory=lambda: _env("QA_MODEL", "llama3.1:8b"))
+    chatbot_history_chars: int = field(default_factory=lambda: _env_int("CHATBOT_HISTORY_CHARS", 4000))
+    chatbot_keep_alive: str = field(default_factory=lambda: _env("CHATBOT_KEEP_ALIVE", "10m"))
     vision_model: str = field(default_factory=lambda: _env("VISION_MODEL", "llava"))
 
     # Qdrant may run locally or on a separate server. API key is optional.

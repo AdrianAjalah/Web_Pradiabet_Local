@@ -78,6 +78,41 @@ def test_chatbot_requires_login(client):
     assert response.headers["location"] == "/login"
 
 
+def test_stream_endpoint_delivers_events_and_saves_complete_history(client, chatbot_db_factory, monkeypatch):
+    from app.api.routes import chatbot
+    user_id = _login_with_profile(client, chatbot_db_factory)
+    chatbot.clear_user_chat_state(user_id)
+    class StreamingOrchestrator:
+        def respond_events(self, *args):
+            yield {"type": "ready"}
+            yield {"type": "delta", "text": "Halo"}
+            yield {"type": "done", "result": {"answer": "Halo", "source": "test", "confidence": 1, "mode": "ollama"}}
+    monkeypatch.setattr(chatbot, "get_chatbot_orchestrator", lambda: StreamingOrchestrator())
+    response = client.post("/tanya", json={"pertanyaan": "halo", "stream": True})
+    assert response.status_code == 200
+    assert "application/x-ndjson" in response.headers["content-type"]
+    events = [json.loads(line) for line in response.text.splitlines()]
+    assert events[0] == {"type": "delta", "text": "Halo"}
+    assert events[-1]["data"]["jawaban"] == "Halo"
+    assert chatbot.chat_histories[user_id][-1]["content"] == "Halo"
+
+
+def test_stream_error_does_not_save_partial_answer(client, chatbot_db_factory, monkeypatch):
+    from app.api.routes import chatbot
+    user_id = _login_with_profile(client, chatbot_db_factory)
+    chatbot.clear_user_chat_state(user_id)
+    class BrokenOrchestrator:
+        def respond_events(self, *args):
+            yield {"type": "ready"}
+            yield {"type": "delta", "text": "Sebagian"}
+            raise RuntimeError("lost connection")
+    monkeypatch.setattr(chatbot, "get_chatbot_orchestrator", lambda: BrokenOrchestrator())
+    response = client.post("/tanya", json={"pertanyaan": "halo", "stream": True})
+    events = [json.loads(line) for line in response.text.splitlines()]
+    assert events[-1]["type"] == "error"
+    assert not chatbot.chat_histories.get(user_id)
+
+
 def test_chatbot_page_uses_v1_title(client, chatbot_db_factory):
     _login_with_profile(client, chatbot_db_factory)
     response = client.get("/chatbot")

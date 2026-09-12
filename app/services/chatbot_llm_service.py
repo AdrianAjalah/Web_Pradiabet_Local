@@ -53,15 +53,19 @@ class ChatbotLlmService:
         self.last_ollama_error: str | None = None
         self.last_provider: str = "none"
 
-    @staticmethod
-    def _safe_history(history: list[dict[str, str]]) -> list[dict[str, str]]:
+    def _safe_history(self, history: list[dict[str, str]]) -> list[dict[str, str]]:
         result = []
-        for item in history[-10:]:
+        remaining = max(0, getattr(self.settings, "chatbot_history_chars", 4000))
+        for item in reversed(history[-10:]):
             role = item.get("role")
             content = str(item.get("content") or "").strip()
             if role in {"user", "assistant"} and content:
-                result.append({"role": role, "content": content[:2000]})
-        return result
+                content = content[:min(2000, remaining)]
+                if not content:
+                    break
+                result.append({"role": role, "content": content})
+                remaining -= len(content)
+        return list(reversed(result))
 
     @staticmethod
     def _extract_json(content: str) -> dict[str, Any] | None:
@@ -96,6 +100,7 @@ class ChatbotLlmService:
                 system=system,
                 format=response_format,
                 temperature=temperature,
+                keep_alive=getattr(self.settings, "chatbot_keep_alive", "10m"),
             )
             if answer:
                 self.last_ollama_error = None
@@ -122,15 +127,36 @@ class ChatbotLlmService:
         )
         return self._extract_json(content or "")
 
-    def answer(self, question: str, context: str, history: list[dict[str, str]]) -> str:
+    def _answer_prompt(self, question, context, history):
         safe_history = self._safe_history(history)
         history_text = "\n".join(f"{item['role']}: {item['content']}" for item in safe_history)
-        prompt = (
+        return (
             f"DATA TERVERIFIKASI:\n{context[:14000] or '-'}\n\n"
             f"RIWAYAT:\n{history_text or '-'}\n\n"
             f"PERTANYAAN USER:\n{question}"
         )
-        answer = self._ollama_chat(prompt=prompt, system=SYSTEM_PROMPT, temperature=0.35)
+    def answer_stream(self, question, context, history):
+        emitted = False
+        try:
+            for chunk in self.ollama.chat_stream(
+                self._answer_prompt(question, context, history), model=self.settings.qa_model,
+                system=SYSTEM_PROMPT, keep_alive=getattr(self.settings, "chatbot_keep_alive", "10m"),
+            ):
+                emitted = True
+                yield chunk
+            if not emitted:
+                raise RuntimeError("AI mengembalikan jawaban kosong.")
+            self.last_provider = "ollama"
+            self.last_ollama_error = None
+        except Exception as exc:
+            self.last_ollama_error = str(exc)
+            self.last_provider = "none"
+            if emitted:
+                raise RuntimeError("Jawaban terputus. Silakan kirim ulang pertanyaan.") from exc
+            yield "Maaf, layanan AI lokal sedang tidak dapat dihubungi."
+
+    def answer(self, question: str, context: str, history: list[dict[str, str]]) -> str:
+        answer = self._ollama_chat(prompt=self._answer_prompt(question, context, history), system=SYSTEM_PROMPT, temperature=0.35)
         if answer:
             return answer
         if context:

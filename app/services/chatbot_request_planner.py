@@ -6,6 +6,20 @@ from typing import Any
 
 
 class DeterministicRequestPlanner:
+    def fast_plan(self, question: str) -> dict[str, Any] | None:
+        """Only bypass the model for explicit, self-contained requests."""
+        q = self._clean(question)
+        if q in self.GREETINGS:
+            return {"intent": "greeting"}
+        # Pronouns, quantities and compound requests need contextual planning.
+        if re.search(r"\b(itu|ini|tadi|tersebut|saya|dan|atau|serta|dengan|darah|normal|harian|kebutuhan|maksimal|minimal)\b|\d", q):
+            return None
+        if re.fullmatch(r"(?:berapa (?:kalori|protein|gula|serat|lemak|karbohidrat|natrium)|(?:cek|tampilkan|lihat) nutrisi) [a-z ]{2,60}", q):
+            plan = self.plan(question)
+            if plan.get("intent") == "food_lookup" and plan.get("food_name"):
+                return plan
+        return None
+
     GREETINGS = {"hai", "halo", "hello", "hi", "pagi", "siang", "sore", "malam", "assalamualaikum"}
     NUTRIENT_FIELDS = {
         "kalori": "kalori_kkal", "kalorinya": "kalori_kkal", "energi": "kalori_kkal",

@@ -1,0 +1,129 @@
+{
+  "model": "llama3.1:8b",
+  "cases": [
+    {
+      "case": "greeting_first",
+      "question": "halo",
+      "stream": true,
+      "http_status": 200,
+      "first_text_seconds": 55.722,
+      "delta_count": 36,
+      "response": {
+        "jawaban": "Halo! Saya Dr. Predia AI, asisten nutrisi PrediBeat. Selamat datang! Bagaimana saya bisa membantu Anda hari ini?",
+        "sumber": "Percakapan Dr. Predia",
+        "confidence": 100.0,
+        "action": null,
+        "mode": "ollama",
+        "timings": {
+          "planner_ms": 0.2,
+          "context_ms": 0.04,
+          "answer_ms": 58826.86,
+          "total_ms": 58827.1,
+          "first_token_ms": 55323.88
+        },
+        "planner_mode": "deterministic"
+      },
+      "success": true,
+      "total_seconds": 59.221
+    },
+    {
+      "case": "greeting_warm",
+      "question": "halo",
+      "stream": true,
+      "http_status": 200,
+      "first_text_seconds": 0.17,
+      "delta_count": 33,
+      "response": {
+        "jawaban": "Halo! Saya Dr. Predia AI, asisten nutrisi PrediBeat. Senang bertemu denganmu! Bagaimana hari ini?",
+        "sumber": "Percakapan Dr. Predia",
+        "confidence": 100.0,
+        "action": null,
+        "mode": "ollama",
+        "timings": {
+          "planner_ms": 0.05,
+          "context_ms": 0.05,
+          "answer_ms": 3359.86,
+          "total_ms": 3359.96,
+          "first_token_ms": 161.03
+        },
+        "planner_mode": "deterministic"
+      },
+      "success": true,
+      "total_seconds": 3.369
+    },
+    {
+      "case": "lookup_stream",
+      "question": "berapa kalori nasi goreng",
+      "stream": true,
+      "http_status": 200,
+      "first_text_seconds": 3.466,
+      "delta_count": 21,
+      "response": {
+        "jawaban": "Nasi goreng memiliki kalori sekitar 336 kkal per porsi 200 gram.",
+        "sumber": "Structured Nutrition Database",
+        "confidence": 100.0,
+        "action": null,
+        "mode": "ollama",
+        "timings": {
+          "planner_ms": 1.66,
+          "context_ms": 169.28,
+          "answer_ms": 5852.21,
+          "total_ms": 6023.14,
+          "first_token_ms": 3460.79
+        },
+        "planner_mode": "deterministic"
+      },
+      "success": true,
+      "total_seconds": 6.029
+    },
+    {
+      "case": "complex_json",
+      "question": "Bandingkan kalori ABC, saus sambal dan ABC, kecap manis.",
+      "stream": false,
+      "http_status": 200,
+      "response": {
+        "jawaban": "Kalori ABC, saus sambal adalah 311,1 kkal, sedangkan kalori ABC, kecap manis adalah 426,7 kkal. Jadi, ABC, kecap manis memiliki kalori lebih tinggi daripada ABC, saus sambal.",
+        "sumber": "Structured Nutrition Database",
+        "confidence": 100.0,
+        "action": null,
+        "mode": "ollama",
+        "timings": {
+          "planner_ms": 4603.82,
+          "context_ms": 353.23,
+          "answer_ms": 8446.94,
+          "total_ms": 13403.98
+        },
+        "planner_mode": "ollama"
+      },
+      "success": true,
+      "total_seconds": 13.411
+    }
+  ],
+  "test_user_removed": true,
+  "loaded_models_before": {
+    "models": []
+  },
+  "loaded_models_after": {
+    "models": [
+      {
+        "name": "llama3.1:8b",
+        "model": "llama3.1:8b",
+        "size": 5609158080,
+        "digest": "46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "llama",
+          "families": [
+            "llama"
+          ],
+          "parameter_size": "8.0B",
+          "quantization_level": "Q4_K_M"
+        },
+        "expires_at": "2026-09-12T12:07:04.3391668+07:00",
+        "size_vram": 4234600775,
+        "context_length": 4096
+      }
+    ]
+  }
+}

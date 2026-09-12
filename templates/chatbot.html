@@ -214,9 +214,12 @@
         }
     }
 
+    let sendingMessage = false;
     async function sendMessage() {
         const message = chatInput.value.trim();
-        if (!message) return;
+        if (!message || sendingMessage) return;
+        sendingMessage = true;
+        sendBtn.disabled = true;
 
         chatHistory.insertAdjacentHTML('beforeend', `
             <div class="self-end bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-3.5 rounded-2xl rounded-tr-none max-w-[85%] md:max-w-[75%] shadow-md text-[15px] leading-relaxed">
@@ -242,9 +245,46 @@
             const response = await fetch('/tanya', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({pertanyaan: message}),
+                body: JSON.stringify({pertanyaan: message, stream: true}),
             });
-            const data = await response.json();
+            let data;
+            if (response.ok && response.headers.get('content-type')?.includes('application/x-ndjson')) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '', partial = '';
+                const consume = (line) => {
+                    if (!line.trim()) return;
+                    const event = JSON.parse(line);
+                    if (event.type === 'error') throw new Error(event.message);
+                    if (event.type === 'delta') {
+                        partial += event.text;
+                        const bubble = document.getElementById(loadingId)?.lastElementChild;
+                        if (bubble) {
+                            bubble.textContent = partial;
+                            bubble.style.whiteSpace = 'pre-wrap';
+                        }
+                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                    }
+                    if (event.type === 'done') data = event.data;
+                };
+                try {
+                    while (true) {
+                        const {value, done} = await reader.read();
+                        buffer += decoder.decode(value, {stream: !done});
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop();
+                        lines.forEach(consume);
+                        if (done) break;
+                    }
+                    consume(buffer);
+                    if (!data) throw new Error('Jawaban terputus. Silakan coba lagi.');
+                } finally {
+                    await reader.cancel();
+                    reader.releaseLock();
+                }
+            } else {
+                data = await response.json();
+            }
             document.getElementById(loadingId)?.remove();
             if (!response.ok) throw new Error(data.detail || 'Permintaan gagal.');
 
@@ -272,6 +312,9 @@
                 </div>
             `);
             chatHistory.scrollTop = chatHistory.scrollHeight;
+        } finally {
+            sendingMessage = false;
+            sendBtn.disabled = false;
         }
     }
 

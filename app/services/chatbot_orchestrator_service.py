@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import time
+import logging
 from typing import Any, Callable
 
 from app.services.chatbot_context_service import build_profile_progress_context, build_rag_context
@@ -27,11 +29,20 @@ class ChatbotOrchestratorService:
         self.rag_context_builder = rag_context_builder
 
     def respond(self, db: Any, user_id: int, question: str, history: list[dict[str, str]]) -> dict[str, Any]:
-        plan = self.llm.plan_request(question, history) or self.planner.plan(question)
+        for event in self.respond_events(db, user_id, question, history, stream=False):
+            if event["type"] == "done":
+                return event["result"]
+
+    def respond_events(self, db, user_id, question, history, *, stream=True):
+        started = time.perf_counter()
+        plan = self.planner.fast_plan(question)
+        planner_mode = "deterministic" if plan else "ollama"
+        plan = plan or self.llm.plan_request(question, history) or self.planner.plan(question)
         plan = self._sanitize_plan(plan, question)
         intent = plan["intent"]
+        planned = time.perf_counter()
 
-        profile_context = self.profile_context_builder(db, user_id)
+        profile_context = self.profile_context_builder(db, user_id) if intent != "greeting" else ""
         tool_result: dict[str, Any] | None = None
         pdf_context = ""
         source = "Percakapan Dr. Predia"
@@ -57,20 +68,43 @@ class ChatbotOrchestratorService:
             source = "Percakapan Dr. Predia"
 
         verified_context = self._build_verified_context(profile_context, plan, tool_result, pdf_context)
-        answer = self.llm.answer(question, verified_context, history)
-        if answer.startswith("Maaf, layanan AI sedang tidak dapat dihubungi"):
+        prepared = time.perf_counter()
+        yield {"type": "ready"}
+        if stream:
+            chunks = []
+            first_token_ms = None
+            for chunk in self.llm.answer_stream(question, verified_context, history):
+                if first_token_ms is None:
+                    first_token_ms = round((time.perf_counter() - started) * 1000, 2)
+                chunks.append(chunk)
+                yield {"type": "delta", "text": chunk}
+            answer = "".join(chunks)
+        else:
+            first_token_ms = None
+            answer = self.llm.answer(question, verified_context, history)
+        if answer.startswith(("Maaf, layanan AI sedang tidak dapat dihubungi", "Maaf, layanan AI lokal sedang tidak dapat dihubungi")):
             answer = self._fallback_answer(plan, tool_result, pdf_context)
             mode = "deterministic"
         else:
             mode = str(getattr(self.llm, "last_provider", "ollama"))
-        return {
+        finished = time.perf_counter()
+        timings = {"planner_ms": round((planned-started)*1000, 2),
+                   "context_ms": round((prepared-planned)*1000, 2),
+                   "answer_ms": round((finished-prepared)*1000, 2),
+                   "total_ms": round((finished-started)*1000, 2)}
+        if first_token_ms is not None:
+            timings["first_token_ms"] = first_token_ms
+        logging.getLogger(__name__).info("Chatbot latency intent=%s planner=%s timings=%s", intent, planner_mode, timings)
+        yield {"type": "done", "result": {
             "answer": answer,
             "source": source,
             "confidence": float(confidence or 0),
             "plan": plan,
             "tool_result": tool_result,
             "mode": mode,
-        }
+            "timings": timings,
+            "planner_mode": planner_mode,
+        }}
 
     @staticmethod
     def _sanitize_plan(plan: dict[str, Any], question: str) -> dict[str, Any]:

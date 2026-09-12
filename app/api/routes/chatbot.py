@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -44,6 +45,7 @@ def get_chatbot_orchestrator() -> ChatbotOrchestratorService:
 
 class ChatRequest(BaseModel):
     pertanyaan: str = Field(min_length=1, max_length=2000)
+    stream: bool = False
 
 
 class ConfirmActionRequest(BaseModel):
@@ -264,16 +266,45 @@ def ask_chatbot(
             "action": _public_action(stored),
         }
 
+    if payload.stream:
+        user_id = current_user.id
+        events = get_chatbot_orchestrator().respond_events(db, user_id, question, list(history))
+        # Finish all database access before handing over the streaming response.
+        next(events)
+
+        def generate():
+            try:
+                for event in events:
+                    if event["type"] == "done":
+                        result = event["result"]
+                        _append_history(user_id, "user", question)
+                        _append_history(user_id, "assistant", result["answer"])
+                        event = {"type": "done", "data": _chat_response(result)}
+                    yield json.dumps(event, ensure_ascii=False) + "\n"
+            except Exception:
+                yield json.dumps({"type": "error", "message": "Jawaban terputus. Silakan coba lagi."}) + "\n"
+            finally:
+                events.close()
+
+        return StreamingResponse(generate(), media_type="application/x-ndjson",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
     result = get_chatbot_orchestrator().respond(db, current_user.id, question, history)
     answer = str(result["answer"])
     _append_history(current_user.id, "user", question)
     _append_history(current_user.id, "assistant", answer)
+    return _chat_response(result)
+
+
+def _chat_response(result):
     return {
-        "jawaban": answer,
+        "jawaban": result["answer"],
         "sumber": result["source"],
         "confidence": round(float(result["confidence"] or 0) * 100, 2),
         "action": None,
         "mode": result.get("mode", "unknown"),
+        "timings": result.get("timings", {}),
+        "planner_mode": result.get("planner_mode", "unknown"),
     }
 
 
