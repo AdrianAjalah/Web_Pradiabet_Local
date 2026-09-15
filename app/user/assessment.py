@@ -1067,6 +1067,10 @@ def _filter_foods_for_pantangan(foods: List[Dict], pantangan: Optional[str]) -> 
         skip = False
         nama = food.get("nama", "").lower()
 
+        if any(k in pantangan_lower for k in ["daging sapi", "beef"]):
+            if "sapi" in nama or "beef" in nama or _norm_lower(food.get("jenis_bahan_utama")) == "daging merah":
+                skip = True
+
         if any(k in pantangan_lower for k in ["seafood", "ikan", "udang", "cumi", "kepiting", "kerang"]):
             if food.get("mengandung_seafood") or food.get("is_seafood") or food.get("is_fish"):
                 skip = True

@@ -26,11 +26,30 @@ def test_single_word_rendang_prioritizes_rendang_sapi_over_sagu_rendang():
     assert names.index("Sagu Rendang") > 1
 
 
+def test_unique_single_token_match_resolves_without_fuzzy_distraction():
+    foods = sample_foods() + [
+        {"id":"6","nama":"Rasbi (Beras Ubi)","gram_porsi":100,"kalori_kkal":394},
+        {"id":"7","nama":"Terasi","gram_porsi":100,"kalori_kkal":155},
+    ]
+    result = StructuredFoodService(foods=foods).lookup("rasbi")
+    assert result["status"] == "found"
+    assert result["food"]["nama"] == "Rasbi (Beras Ubi)"
+
+
 def test_ambiguous_lookup_returns_candidates():
     service = StructuredFoodService(foods=sample_foods())
     result = service.lookup("rendang")
     assert result["status"] == "ambiguous"
     assert len(result["candidates"]) >= 3
+
+
+def test_multi_word_lookup_does_not_offer_partial_token_matches():
+    foods = sample_foods() + [
+        {"id":"6","nama":"Sate Ayam","gram_porsi":150,"kalori_kkal":338},
+        {"id":"7","nama":"Sate Kambing","gram_porsi":160,"kalori_kkal":320},
+    ]
+    result = StructuredFoodService(foods=foods).lookup("sate padang")
+    assert result == {"status": "not_found", "query": "sate padang", "candidates": []}
 
 
 def test_filter_foods_uses_numeric_constraints_and_sorting():

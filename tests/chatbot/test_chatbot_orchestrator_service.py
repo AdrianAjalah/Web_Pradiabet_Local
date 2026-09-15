@@ -9,9 +9,11 @@ class FakeLlm:
         self.plan = plan
         self.answer_text = answer_text
         self.contexts = []
+        self.answer_calls = 0
     def plan_request(self, question, history):
         return self.plan
     def answer(self, question, context, history):
+        self.answer_calls += 1
         self.contexts.append(context)
         return self.answer_text
 
@@ -42,8 +44,18 @@ def test_natural_food_lookup_includes_structured_result_in_llm_context():
 
 def test_meal_total_is_grounded_in_python_result():
     llm = FakeLlm(plan={"intent":"meal_total","items":[{"food_name":"nasi goreng","quantity":1},{"food_name":"bubur ayam","quantity":1}]})
-    make_service(llm).respond(None, 1, "total", [])
-    assert "634" in llm.contexts[0]
+    result = make_service(llm).respond(None, 1, "saya makan nasi goreng dan bubur ayam berapa total kalori saya", [])
+    assert "634" in result["answer"]
+    assert result["mode"] == "deterministic"
+    assert llm.answer_calls == 0
+
+
+def test_food_comparison_is_rendered_without_llm_rewriting_numbers():
+    llm = FakeLlm(plan={"intent":"compare_foods","food_names":["nasi goreng","bubur ayam"]})
+    result = make_service(llm).respond(None, 1, "bandingkan nasi goreng dan bubur ayam", [])
+    assert "336" in result["answer"] and "298" in result["answer"]
+    assert result["mode"] == "deterministic"
+    assert llm.answer_calls == 0
 
 
 def test_pdf_education_keeps_hybrid_pdf_context():

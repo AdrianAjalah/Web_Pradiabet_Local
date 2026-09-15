@@ -309,6 +309,14 @@ def dashboard(
     profile = db.scalar(select(UserProfileDB).where(UserProfileDB.user_id == current_user.id))
     if profile is None:
         return _redirect("/questionnaire")
+    UserProgramActionService(
+        db,
+        analyzer=analisis_user,
+        meal_plan_generator=generate_meal_plan_tervalidasi,
+    ).ensure_daily_meal_plan(current_user.id)
+    db.commit()
+    profile = db.scalar(select(UserProfileDB).where(UserProfileDB.user_id == current_user.id))
+    assert profile is not None
     try:
         profile_data = json.loads(profile.full_profile_data)
         analysis_data = json.loads(profile.analysis_result)
@@ -373,6 +381,8 @@ def _decode_profile_row(row: UserProfileDB) -> tuple[dict, dict]:
 def _recalculate_for_profile(row: UserProfileDB, profile_data: dict) -> dict:
     model = ProfilUser(**profile_data)
     result = analisis_user(model).model_dump()
+    from app.services.common_utils import today
+    result["meal_plan_date"] = today().isoformat()
     row.full_profile_data = json.dumps(profile_data, ensure_ascii=False)
     row.analysis_result = json.dumps(result, ensure_ascii=False)
     row.updated_at = datetime.now(timezone.utc)

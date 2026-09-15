@@ -12,7 +12,8 @@ from app.user.security import hash_password
 
 
 @pytest.fixture()
-def client(chatbot_db_factory):
+def client(chatbot_db_factory, monkeypatch):
+    monkeypatch.setattr('app.api.routes.chatbot.word_food_answer', lambda question, answer: (answer, False))
     app = create_app()
 
     def override_db():
@@ -125,10 +126,10 @@ def test_action_question_returns_confirmation_without_executing(client, chatbot_
     from app.api.routes import chatbot
 
     monkeypatch.setattr(
-        chatbot,
-        "build_pending_action",
-        lambda plan: {
-            "type": "regenerate_meal_plan",
+        chatbot.PersonalChatService,
+        "preview",
+        lambda *args, **kwargs: {
+            "type": "replace_meal_plan",
             "title": "Generate Ulang Meal Plan?",
             "message": "Meal plan akan diganti.",
             "confirm_label": "Generate Ulang Meal Plan",
@@ -138,9 +139,9 @@ def test_action_question_returns_confirmation_without_executing(client, chatbot_
     payload = response.json()
 
     assert response.status_code == 200
-    assert payload["action"]["type"] == "regenerate_meal_plan"
+    assert payload["action"]["type"] == "replace_meal_plan"
     assert payload["action"]["id"]
-    assert "belum dijalankan" in payload["jawaban"].lower()
+    assert "menu" in payload["jawaban"].lower()
 
 
 def test_confirm_endpoint_executes_pending_action(client, chatbot_db_factory, monkeypatch):
@@ -148,10 +149,10 @@ def test_confirm_endpoint_executes_pending_action(client, chatbot_db_factory, mo
     from app.api.routes import chatbot
 
     monkeypatch.setattr(
-        chatbot,
-        "build_pending_action",
-        lambda plan: {
-            "type": "regenerate_meal_plan",
+        chatbot.PersonalChatService,
+        "preview",
+        lambda *args, **kwargs: {
+            "type": "replace_meal_plan",
             "title": "Generate Ulang Meal Plan?",
             "message": "Meal plan akan diganti.",
             "confirm_label": "Generate Ulang Meal Plan",
@@ -180,10 +181,10 @@ def test_cancel_endpoint_removes_pending_action(client, chatbot_db_factory, monk
     from app.api.routes import chatbot
 
     monkeypatch.setattr(
-        chatbot,
-        "build_pending_action",
-        lambda plan: {
-            "type": "regenerate_meal_plan",
+        chatbot.PersonalChatService,
+        "preview",
+        lambda *args, **kwargs: {
+            "type": "replace_meal_plan",
             "title": "Generate Ulang Meal Plan?",
             "message": "Meal plan akan diganti.",
             "confirm_label": "Generate Ulang Meal Plan",
@@ -243,6 +244,7 @@ def test_direct_ganti_menu_returns_confirmation_instead_of_llm_answer(
         raise AssertionError("LLM tidak boleh dipanggil untuk perintah perubahan meal plan")
 
     monkeypatch.setattr(chatbot.ChatbotLlmService, "answer", fail_if_llm_is_called)
+    monkeypatch.setattr(chatbot.PersonalChatService, "preview", lambda *a, **k: {"type": "replace_meal_plan", "message": "Kandidat menu belum disimpan."})
 
     response = client.post(
         "/tanya",
@@ -251,8 +253,8 @@ def test_direct_ganti_menu_returns_confirmation_instead_of_llm_answer(
     payload = response.json()
 
     assert response.status_code == 200
-    assert payload["action"]["type"] == "regenerate_meal_plan"
-    assert "belum dijalankan" in payload["jawaban"].lower()
+    assert payload["action"]["type"] == "replace_meal_plan"
+    assert "menu" in payload["jawaban"].lower()
 
 
 
@@ -280,3 +282,114 @@ def test_chatbot_status_reports_local_ollama_provider(client, chatbot_db_factory
     assert payload["model"] == "llama3.1:8b"
     assert payload["last_provider"] == "ollama"
     assert payload["last_ollama_error"] is None
+
+
+def test_menu_preview_retry_cancel_and_confirm_are_isolated(client, chatbot_db_factory, monkeypatch):
+    from app.api.routes import chatbot
+    from app.user.action_service import UserProgramActionService
+    from tests.chatbot.test_personal_recommendations import meal
+
+    uid = _login_with_profile(client, chatbot_db_factory)
+    original = [meal('Pagi', 'Menu pagi'), meal('Siang', 'Menu siang')]
+    with chatbot_db_factory() as db:
+        row = db.query(UserProfileDB).filter_by(user_id=uid).first()
+        analysis = json.loads(row.analysis_result)
+        analysis['meal_plan'] = original
+        row.analysis_result = json.dumps(analysis)
+        db.commit()
+
+    count = [0]
+    def generate(self, user_id, *, preview=False):
+        assert preview
+        count[0] += 1
+        return {'meal_plan': [meal('Pagi', 'Pagi baru'), meal('Siang', f'Siang baru {count[0]}')]}
+    monkeypatch.setattr(UserProgramActionService, 'regenerate_meal_plan', generate)
+    def stored():
+        with chatbot_db_factory() as db:
+            return json.loads(db.query(UserProfileDB).filter_by(user_id=uid).first().analysis_result)['meal_plan']
+
+    action = client.post('/tanya', json={'pertanyaan': 'rekomendasi makan siang hari ini', 'stream': True}).json()['action']
+    assert action['type'] == 'meal_plan_display'
+    assert 'Menu siang' in action['message'] and 'Menu pagi' not in action['message']
+    draft = client.post('/api/chatbot/actions/another', json={'action_id': action['id']}).json()['action']
+    assert stored() == original
+    assert not {'candidate', 'base_snapshot', 'seen', 'validation'} & draft.keys()
+    retry = client.post('/api/chatbot/actions/another', json={'action_id': draft['id']}).json()['action']
+    assert 'Siang baru 2' in retry['message'] and stored() == original
+    assert client.post('/api/chatbot/actions/confirm', json={'action_id': draft['id']}).status_code == 400
+    assert client.post('/api/chatbot/actions/cancel', json={'action_id': retry['id']}).status_code == 200
+    assert stored() == original
+    new = client.post('/tanya', json={'pertanyaan': 'ganti menu makan siang'}).json()['action']
+    assert client.post('/api/chatbot/actions/confirm', json={'action_id': new['id']}).status_code == 200
+    assert stored()[0] == original[0]
+    assert stored()[1]['items'][0]['nama'] == 'Siang baru 3'
+
+
+def test_similar_food_followup_stays_grounded(client, chatbot_db_factory, monkeypatch):
+    _login_with_profile(client, chatbot_db_factory)
+    from app.services import chatbot_personal_service
+    from app.api.routes import chatbot
+    monkeypatch.setattr(chatbot_personal_service, 'load_nutrition_foods', lambda: [
+        {'nama': 'Sarimi, Mie goreng', 'tingkat_proses': 'Ultraproses', 'slot_meal_plan': 'No Meal'},
+    ])
+    def no_llm():
+        raise AssertionError('Food selection must stay deterministic')
+    monkeypatch.setattr(chatbot, 'get_chatbot_orchestrator', no_llm)
+    response = client.post('/tanya', json={'pertanyaan': 'apakah saya boleh makan makan mie goreng?'}).json()
+    assert 'nama yang mirip' in response['jawaban']
+    selected = client.post('/tanya', json={'pertanyaan': 'Sarimi, Mie goreng'}).json()
+    assert selected['jawaban'].startswith('Sarimi, Mie goreng:')
+    assert 'ultra proses' in selected['jawaban']
+
+
+@pytest.mark.parametrize('followup', [
+    'apakah saya boleh memakannya?',
+    'apakah saya boleh memakannnya?',
+    'apakah saya boleh makan keduanya?',
+    'apakah makanan itu boleh saya makan?',
+])
+def test_contextual_food_followup_resolves_previous_total(client, chatbot_db_factory, monkeypatch, followup):
+    uid = _login_with_profile(client, chatbot_db_factory)
+    from app.services import chatbot_personal_service
+    from app.api.routes import chatbot
+
+    foods = [
+        {'nama': 'Sate Ayam', 'gram_porsi': 150, 'kalori_kkal': 338,
+         'kelompok_makanan': 'Lauk Hewani', 'tingkat_proses': 'Olahan',
+         'slot_meal_plan': 'Lauk', 'natrium_mg': 530, 'gula_g': 4.2,
+         'missing_nutrients': []},
+        {'nama': 'Sate Maranggi', 'gram_porsi': 250, 'kalori_kkal': 520,
+         'kelompok_makanan': 'Lauk Hewani', 'tingkat_proses': 'Olahan',
+         'slot_meal_plan': 'Lauk', 'natrium_mg': 850, 'gula_g': 10.2,
+         'missing_nutrients': []},
+    ]
+    monkeypatch.setattr(chatbot_personal_service, 'load_nutrition_foods', lambda: foods)
+    chatbot.chat_histories[uid] = [{
+        'role': 'assistant',
+        'content': 'Berdasarkan porsi pada dataset:\n\n- Sate Ayam: 338 kkal untuk 150 g\n- Sate Maranggi: 520 kkal untuk 250 g\n\nTotal: **858 kkal**.',
+    }]
+
+    response = client.post('/tanya', json={'pertanyaan': followup}).json()
+    assert 'Sate Ayam:' in response['jawaban']
+    assert 'Sate Maranggi:' in response['jawaban']
+    assert "'memakannnya'" not in response['jawaban']
+
+
+def test_profile_read_uses_logged_in_account_without_llm(client, chatbot_db_factory, monkeypatch):
+    uid = _login_with_profile(client, chatbot_db_factory)
+    from app.api.routes import chatbot
+    def no_llm(*args, **kwargs):
+        raise AssertionError('Profile values must not be generated by an LLM')
+    monkeypatch.setattr(chatbot, 'get_chatbot_orchestrator', no_llm)
+    monkeypatch.setattr(chatbot, 'word_food_answer', no_llm)
+    with chatbot_db_factory() as db:
+        # An unrelated profile must never be selected by a caller-supplied ID.
+        db.add(UserProfileDB(user_id=uid + 1000, full_profile_data=json.dumps({'usia': 99}), analysis_result='{}'))
+        db.commit()
+    response = client.post('/tanya', json={'pertanyaan': 'cek profil kesehatan saya', 'stream': True, 'user_id': uid + 1000})
+    assert response.status_code == 200
+    result = response.json()
+    assert '35 tahun' in result['jawaban'] and '70 kg' in result['jawaban'] and '170 cm' in result['jawaban']
+    assert '99 tahun' not in result['jawaban'] and '[Nilai' not in result['jawaban']
+    assert 'Prediabetes' not in result['jawaban']
+    assert result['mode'] == 'verified_data'

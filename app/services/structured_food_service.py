@@ -63,9 +63,26 @@ class StructuredFoodService:
         if not candidates:
             return {"status": "not_found", "query": query, "candidates": []}
         normalized_query = self.database.normalize(query)
+        query_tokens = normalized_query.split()
+        # Untuk nama majemuk, kandidat harus memuat semua kata. Contohnya
+        # "sate padang" tidak boleh diarahkan ke sate ayam hanya karena sama-sama sate.
+        if len(query_tokens) >= 2:
+            strong_candidates = [
+                item for item in candidates
+                if all(token in self.database.normalize(item.get("nama", "")).split() for token in query_tokens)
+            ]
+            if not strong_candidates:
+                return {"status": "not_found", "query": query, "candidates": []}
+            candidates = strong_candidates
         exact = [item for item in candidates if self.database.normalize(item.get("nama", "")) == normalized_query]
         if len(exact) == 1:
             return {"status": "found", "query": query, "food": exact[0], "candidates": candidates}
+        token_matches = [
+            item for item in candidates
+            if all(token in self.database.normalize(item.get("nama", "")).split() for token in query_tokens)
+        ]
+        if len(token_matches) == 1:
+            return {"status": "found", "query": query, "food": token_matches[0], "candidates": candidates}
         # A specific multi-token query with a clearly dominant first result is safe to resolve.
         if len(normalized_query.split()) >= 2 and candidates:
             first_name = self.database.normalize(candidates[0].get("nama", ""))

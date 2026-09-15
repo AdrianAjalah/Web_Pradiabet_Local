@@ -184,6 +184,11 @@ class ChatbotActionExecutor:
             return self._add_foods(user_id, action, selections or [])
         program = UserProgramActionService(self.db)
         try:
+            if action_type == "replace_meal_plan":
+                from app.services.chatbot_personal_service import PersonalChatService
+                result = PersonalChatService(self.db).apply(user_id, action)
+                self.db.commit()
+                return result
             if action_type == "change_diet":
                 result = program.activate_diet(user_id, str(action.get("diet_id") or ""))
                 self.db.commit()

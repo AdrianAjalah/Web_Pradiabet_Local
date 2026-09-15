@@ -30,11 +30,11 @@
 
     <!-- Header Chat -->
     <div class="mb-6 flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-            <i class="fas fa-robot text-2xl"></i>
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shadow-lg shadow-emerald-500/15 overflow-hidden">
+            <img src="/static/WajahMaskot2.png?v=2" alt="Predi" class="w-full h-full object-contain p-0.5">
         </div>
         <div>
-            <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">Konsultasi Dr. Predia AI</h2>
+            <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">Konsultasi Predi AI</h2>
             <p class="text-slate-500 font-medium text-sm mt-0.5">Tanyakan nutrisi, hitung konsumsi, rekomendasi menu, atau edukasi dari dokumen PDF.</p>
         </div>
     </div>
@@ -47,10 +47,10 @@
             
             <!-- Pesan Pembuka Bot -->
             <div class="self-start flex gap-3 max-w-[85%] md:max-w-[75%]">
-                <img src="/static/logo.png" alt="Dr. Predia" class="w-8 h-8 rounded-full object-cover drop-shadow-sm flex-shrink-0" onerror="this.src='https://placehold.co/32x32/10b981/ffffff?text=AI'">
+                <img src="/static/WajahMaskot.png?v=2" alt="Predi" class="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 object-contain drop-shadow-sm flex-shrink-0">
                 <div class="bg-white border border-slate-100 text-slate-700 px-5 py-4 rounded-2xl rounded-tl-none shadow-sm text-[15px] bot-content">
-                    <p>Halo <strong>{{ user.username }}</strong>! 👋</p>
-                    <p>Berdasarkan profil Anda, ada yang bisa saya bantu terkait menu makanan atau rutinitas olahraga hari ini?</p>
+                    <p>Halo sahabat predi! 👋</p>
+                    <p>apakah kamu perlu bantuan?</p>
                 </div>
             </div>
 
@@ -127,14 +127,15 @@
                     <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0"><i class="fas fa-shield-alt"></i></div>
                     <div class="flex-1">
                         <h4 class="font-black text-slate-800">${escapeHtml(action.title || 'Konfirmasi Tindakan')}</h4>
-                        <p class="text-sm font-semibold text-slate-600 mt-1 leading-relaxed">${escapeHtml(action.message || '')}</p>
+                        <p class="text-sm font-semibold text-slate-600 mt-1 leading-relaxed whitespace-pre-line">${escapeHtml(action.message || '')}</p>
                     </div>
                 </div>
                 <div class="action-groups mt-4 space-y-3">${groupsHtml}</div>
                 <div class="action-result hidden mt-4 rounded-xl p-3 text-sm font-bold"></div>
                 <div class="action-buttons mt-4 flex flex-wrap gap-2">
-                    <button type="button" class="confirm-action-btn px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black">Konfirmasi — ${escapeHtml(action.confirm_label || 'Jalankan')}</button>
-                    <button type="button" class="cancel-action-btn px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-black">Batal</button>
+                    ${action.type !== 'meal_plan_display' ? `<button type="button" class="confirm-action-btn px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black">${escapeHtml(action.confirm_label || 'Konfirmasi')}</button>` : ''}
+                    ${['meal_plan_display', 'replace_meal_plan'].includes(action.type) ? '<button type="button" class="another-menu-btn px-4 py-2.5 rounded-xl bg-teal-700 text-white text-sm font-black">Cari menu lain</button>' : ''}
+                    <button type="button" class="cancel-action-btn px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-black">${['meal_plan_display', 'replace_meal_plan'].includes(action.type) ? 'Tetap pakai menu sebelumnya' : 'Batal'}</button>
                 </div>
             </div>
         `;
@@ -154,6 +155,28 @@
         });
         card.querySelector('.confirm-action-btn')?.addEventListener('click', () => confirmAction(action.id));
         card.querySelector('.cancel-action-btn')?.addEventListener('click', () => cancelAction(action.id));
+        card.querySelector('.another-menu-btn')?.addEventListener('click', () => anotherMenu(action.id));
+    }
+
+    async function anotherMenu(actionId) {
+        const card = document.getElementById(`action-card-${actionId}`);
+        if (!card) return;
+        card.querySelectorAll('button').forEach(button => button.disabled = true);
+        try {
+            const response = await fetch('/api/chatbot/actions/another', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action_id: actionId}),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'Kandidat belum tersedia.');
+            showActionResult(card, 'Kandidat berikutnya sudah ditampilkan. Menu aktif belum berubah.', true);
+            card.insertAdjacentHTML('afterend', renderActionCard(data.action));
+            initializeActionCard(data.action);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        } catch (error) {
+            card.querySelectorAll('button').forEach(button => button.disabled = false);
+            showActionResult(card, error.message, false, false);
+        }
     }
 
     function actionSelections(card) {
@@ -233,7 +256,7 @@
         const loadingId = 'loading-' + Date.now();
         chatHistory.insertAdjacentHTML('beforeend', `
             <div id="${loadingId}" class="self-start flex gap-3 max-w-[85%] md:max-w-[75%]">
-                <img src="/static/logo.png" alt="Dr. Predia" class="w-8 h-8 rounded-full object-cover opacity-70 flex-shrink-0" onerror="this.src='/static/WajahMaskot.png'">
+                <img src="/static/WajahMaskot.png?v=2" alt="Predi" class="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 object-contain opacity-80 flex-shrink-0">
                 <div class="bg-white border border-slate-100 text-slate-400 px-5 py-4 rounded-2xl rounded-tl-none shadow-sm text-[15px] italic flex items-center gap-2">
                     <i class="fas fa-circle-notch fa-spin text-emerald-500"></i> Menganalisis data nutrisi...
                 </div>
@@ -291,12 +314,12 @@
             const actionHtml = data.action ? renderActionCard(data.action) : '';
             chatHistory.insertAdjacentHTML('beforeend', `
                 <div class="self-start flex gap-3 max-w-[85%] md:max-w-[85%]">
-                    <img src="/static/logo.png" alt="Dr. Predia" class="w-8 h-8 rounded-full object-cover drop-shadow-sm flex-shrink-0 mt-1" onerror="this.src='/static/WajahMaskot.png'">
+                    <img src="/static/WajahMaskot.png?v=2" alt="Predi" class="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 object-contain drop-shadow-sm flex-shrink-0 mt-1">
                     <div class="bg-white border border-slate-100 text-slate-700 px-6 py-5 rounded-2xl rounded-tl-none shadow-sm text-[15px] bot-content">
                         ${marked.parse(data.jawaban || '')}
                         ${actionHtml}
                         <div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                            <i class="fas fa-book-medical"></i> Sumber: <span class="text-emerald-600">${escapeHtml(data.sumber || 'PrediBeat')}</span><span class="ml-2 text-slate-300">•</span><span class="ml-2 normal-case tracking-normal">${escapeHtml(data.mode === 'ollama' ? 'Ollama lokal' : data.mode === 'deterministic' ? 'Fallback terstruktur' : '')}</span>
+                            <i class="fas fa-book-medical"></i> Sumber: <span class="text-emerald-600">${escapeHtml(data.sumber || 'PrediBeat')}</span><span class="ml-2 text-slate-300">•</span><span class="ml-2 normal-case tracking-normal">${escapeHtml(data.mode === 'ollama' ? 'Ollama lokal' : data.mode === 'grounded_wording' ? 'Penjelasan AI berdasarkan data' : ['deterministic', 'verified_data'].includes(data.mode) ? 'Berdasarkan data aplikasi' : '')}</span>
                         </div>
                     </div>
                 </div>

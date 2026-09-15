@@ -20,6 +20,23 @@ def test_meal_total_is_calculated_by_python():
     assert len(result["items"]) == 2
 
 
+def test_meal_total_does_not_multiply_per_portion_calories_by_grams():
+    result = tool_service().execute({"intent":"meal_total","items":[{"food_name":"nasi goreng","quantity":1}]})
+    assert result["totals"]["kalori_kkal"] == 336
+    assert result["items"][0]["grams"] == 200
+
+
+def test_meal_total_refuses_food_with_missing_calories():
+    service = ChatbotToolService(StructuredFoodService(foods=[
+        {"id":"1","nama":"Sate Ayam","gram_porsi":150,"kalori_kkal":338},
+        {"id":"2","nama":"Sate Padang","gram_porsi":100,"kalori_kkal":0},
+    ]))
+    result = service.execute({"intent":"meal_total","items":[
+        {"food_name":"sate ayam","quantity":1}, {"food_name":"sate padang","quantity":1},
+    ]})
+    assert result["status"] == "missing_nutrition"
+
+
 def test_ambiguous_lookup_returns_choices_instead_of_guessing():
     result = tool_service().execute({"intent":"food_lookup","food_name":"rendang","requested_fields":["protein_g"]})
     assert result["status"] == "ambiguous"

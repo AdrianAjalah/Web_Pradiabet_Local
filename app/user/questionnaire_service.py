@@ -13,6 +13,7 @@ from app.database.models.user import (
     QuestionnaireDraftDB,
     UserProfileDB,
 )
+from app.services.common_utils import today
 from app.user.schemas import ProfilUser
 
 
@@ -161,7 +162,10 @@ def save_completed_assessment(
     analysis_data: Mapping[str, Any],
 ) -> UserProfileDB:
     profile_json = json.dumps(dict(profile_data), ensure_ascii=False)
-    analysis_json = json.dumps(dict(analysis_data), ensure_ascii=False)
+    analysis_payload = dict(analysis_data)
+    if analysis_payload.get("meal_plan"):
+        analysis_payload["meal_plan_date"] = today().isoformat()
+    analysis_json = json.dumps(analysis_payload, ensure_ascii=False)
     existing = db.scalar(select(UserProfileDB).where(UserProfileDB.user_id == user_id))
     if existing:
         db.add(

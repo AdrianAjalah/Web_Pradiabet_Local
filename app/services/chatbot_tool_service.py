@@ -51,6 +51,17 @@ class ChatbotToolService:
         unresolved = [item for item in resolved if item.get("status") != "found"]
         if unresolved:
             return {"intent": "meal_total", "status": "needs_clarification", "items": resolved, "unresolved": unresolved}
+        missing_nutrition = [
+            item for item in resolved
+            if float(item.get("food", {}).get("kalori_kkal") or 0) <= 0
+        ]
+        if missing_nutrition:
+            return {
+                "intent": "meal_total",
+                "status": "missing_nutrition",
+                "items": resolved,
+                "missing_nutrition": missing_nutrition,
+            }
         totals = {key: round(sum(float(item["scaled"].get(key) or 0) for item in resolved), 2) for key in NUTRIENT_KEYS}
         return {"intent": "meal_total", "status": "calculated", "items": resolved, "totals": totals}
 

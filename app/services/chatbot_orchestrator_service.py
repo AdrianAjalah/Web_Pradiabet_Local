@@ -42,6 +42,25 @@ class ChatbotOrchestratorService:
         intent = plan["intent"]
         planned = time.perf_counter()
 
+        # Even requests classified by the model must not fall back to a generic
+        # lowest-calorie list for a personal recommendation.
+        if intent == "recommend_foods" or (intent == "mixed" and plan.get("food_plan", {}).get("intent") == "recommend_foods"):
+            from app.services.chatbot_personal_service import PersonalChatService, meal_scope
+            from app.user.action_service import UserActionError
+            menu_action = None
+            try:
+                menu_action = PersonalChatService(db).recommend(user_id, meal_scope(question))
+                answer = "Silakan periksa meal plan aktif Anda."
+            except UserActionError as exc:
+                answer = str(exc)
+            yield {"type": "ready"}
+            yield {"type": "done", "result": {
+                "answer": answer, "source": "Profil & meal plan PrediBeat", "confidence": 0,
+                "mode": "deterministic", "plan": plan, "menu_action": menu_action,
+                "planner_mode": planner_mode, "timings": {"total_ms": round((time.perf_counter()-started)*1000, 2)},
+            }}
+            return
+
         profile_context = self.profile_context_builder(db, user_id) if intent != "greeting" else ""
         tool_result: dict[str, Any] | None = None
         pdf_context = ""
@@ -66,6 +85,25 @@ class ChatbotOrchestratorService:
             source = "Batas Domain PrediBeat"
         elif intent in {"greeting", "general_chat"}:
             source = "Percakapan Dr. Predia"
+
+        # Total dan porsi dirender langsung dari hasil tool. Model bahasa tidak
+        # diberi kesempatan menghitung ulang angka yang sudah pasti.
+        if intent in {"meal_total", "compare_foods"}:
+            answer = self._fallback_answer(plan, tool_result, pdf_context)
+            finished = time.perf_counter()
+            timings = {
+                "planner_ms": round((planned-started)*1000, 2),
+                "context_ms": round((finished-planned)*1000, 2),
+                "answer_ms": 0,
+                "total_ms": round((finished-started)*1000, 2),
+            }
+            yield {"type": "ready"}
+            yield {"type": "done", "result": {
+                "answer": answer, "source": source, "confidence": float(confidence or 0),
+                "plan": plan, "tool_result": tool_result, "mode": "deterministic",
+                "timings": timings, "planner_mode": planner_mode,
+            }}
+            return
 
         verified_context = self._build_verified_context(profile_context, plan, tool_result, pdf_context)
         prepared = time.perf_counter()
@@ -118,6 +156,11 @@ class ChatbotOrchestratorService:
             intent = "general_chat"
         result["intent"] = intent
         fallback = DeterministicRequestPlanner().plan(question)
+
+        # Pertanyaan total yang eksplisit selalu memakai hasil parser lokal.
+        # Ini mencegah model mengganti daftar makanan atau rumus perhitungan.
+        if fallback.get("intent") == "meal_total":
+            return fallback
 
         # Model dapat menganggap pertanyaan fakta dari jurnal sebagai general_chat
         # atau food_lookup. Untuk pola referensi dokumen yang eksplisit, parser
@@ -178,6 +221,28 @@ class ChatbotOrchestratorService:
         if status == "not_found":
             return "Makanan tersebut belum ditemukan dalam dataset PrediBeat. Coba gunakan nama yang lebih singkat atau lebih spesifik."
         if status in {"ambiguous", "needs_clarification"}:
+            if tool_result.get("intent") == "meal_total":
+                known = []
+                unknown = []
+                suggestions = []
+                for item in tool_result.get("items") or []:
+                    if item.get("status") == "found":
+                        food = item.get("food") or {}
+                        known.append(
+                            f"- {food.get('nama')}: {self._fmt(item.get('scaled', {}).get('kalori_kkal'))} kkal "
+                            f"untuk {self._fmt(item.get('grams'))} g"
+                        )
+                    else:
+                        unknown.append(str(item.get("query") or "makanan tersebut"))
+                        suggestions.extend(
+                            candidate.get("nama") for candidate in item.get("candidates") or []
+                            if candidate.get("nama")
+                        )
+                details = ("\n".join(known) + "\n\n") if known else ""
+                message = details + "Total belum dapat dihitung karena " + ", ".join(unknown) + " belum ditemukan secara pasti di dataset PrediBeat."
+                if suggestions:
+                    message += " Kandidat yang tersedia: " + ", ".join(dict.fromkeys(suggestions[:5])) + "."
+                return message
             candidates = tool_result.get("candidates") or []
             if not candidates:
                 for item in tool_result.get("unresolved") or tool_result.get("items") or []:
@@ -191,6 +256,27 @@ class ChatbotOrchestratorService:
                 choices = "\n".join(f"{idx}. {name}" for idx, name in enumerate(names[:5], 1))
                 return f"Saya menemukan beberapa kemungkinan:\n{choices}\n\nYang mana yang Anda maksud?"
             return "Saya membutuhkan nama makanan atau ukuran porsi yang lebih spesifik agar perhitungannya tepat."
+        if status == "missing_nutrition":
+            available = []
+            missing = []
+            for item in tool_result.get("items") or []:
+                food = item.get("food") or {}
+                name = food.get("nama") or item.get("query")
+                calories = float(food.get("kalori_kkal") or 0)
+                grams = self._fmt(item.get("grams") or food.get("gram_porsi") or 100)
+                if calories > 0:
+                    available.append(
+                        f"- {name}: {self._fmt(item.get('scaled', {}).get('kalori_kkal'))} kkal untuk {grams} g"
+                    )
+                else:
+                    missing.append(str(name))
+            details = "\n".join(available)
+            prefix = (details + "\n\n") if details else ""
+            return (
+                prefix + "Saya belum dapat menghitung totalnya karena data kalori "
+                + ", ".join(missing)
+                + " belum tersedia di dataset PrediBeat. Sebutkan produk atau varian lain yang datanya tersedia."
+            )
         if status == "found" and tool_result.get("food"):
             food = tool_result["food"]
             fields = tool_result.get("requested_fields") or ["kalori_kkal", "karbohidrat_g", "protein_g", "lemak_g", "serat_g", "gula_g", "natrium_mg"]
@@ -218,8 +304,11 @@ class ChatbotOrchestratorService:
         if status == "calculated" and tool_result.get("totals"):
             lines = []
             for item in tool_result.get("items") or []:
-                lines.append(f"- {item['food'].get('nama')}: {self._fmt(item['scaled'].get('kalori_kkal'))} kkal")
-            return "Jika porsinya sesuai dataset:\n" + "\n".join(lines) + f"\n\nTotalnya sekitar **{self._fmt(tool_result['totals'].get('kalori_kkal'))} kkal**."
+                lines.append(
+                    f"- {item['food'].get('nama')}: {self._fmt(item['scaled'].get('kalori_kkal'))} kkal "
+                    f"untuk {self._fmt(item.get('grams'))} g"
+                )
+            return "Berdasarkan porsi pada dataset:\n" + "\n".join(lines) + f"\n\nTotal: **{self._fmt(tool_result['totals'].get('kalori_kkal'))} kkal**."
         if status == "found" and tool_result.get("foods"):
             lines = [f"{i}. {food.get('nama')} — {self._fmt(food.get('kalori_kkal'))} kkal, protein {self._fmt(food.get('protein_g'))} g, serat {self._fmt(food.get('serat_g'))} g, gula {self._fmt(food.get('gula_g'))} g" for i, food in enumerate(tool_result["foods"], 1)]
             return "Berikut hasil dari dataset PrediBeat:\n" + "\n".join(lines)

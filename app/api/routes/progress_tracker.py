@@ -37,6 +37,7 @@ from app.services.progress_service import (
     summarize_week,
 )
 from app.services.weekly_insight_service import build_weekly_insight
+from app.user.action_service import UserProgramActionService
 
 router = APIRouter(prefix="/progress", tags=["progress-tracker"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[3] / "templates"))
@@ -104,6 +105,8 @@ async def progress_page(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(require_current_user),
 ):
+    UserProgramActionService(db).ensure_daily_meal_plan(current_user.id)
+    db.commit()
     profile_data, analysis, _ = get_profile_analysis(db, current_user.id)
 
     today_date = today()
@@ -235,6 +238,8 @@ async def save_daily_progress(
     current_user: UserDB = Depends(require_current_user),
 ):
     form = await request.form()
+    UserProgramActionService(db).ensure_daily_meal_plan(current_user.id)
+    db.commit()
     profile_data, analysis, _ = get_profile_analysis(db, current_user.id)
 
     tanggal = parse_date(form.get("tanggal"), today())

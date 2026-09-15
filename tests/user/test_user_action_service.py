@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -100,3 +101,45 @@ def test_activate_unsupported_diet_is_rejected(db_session_factory):
     with db_session_factory() as db:
         with pytest.raises(UserActionError, match="belum dapat diaktifkan"):
             UserProgramActionService(db).activate_diet(user_id, "keto")
+
+
+def test_first_daily_check_stamps_existing_plan_without_replacing_it(db_session_factory):
+    user_id = _seed(db_session_factory)
+    current = date(2026, 9, 15)
+
+    def must_not_generate(**kwargs):
+        raise AssertionError("existing plan must be preserved on migration day")
+
+    with db_session_factory() as db:
+        result = UserProgramActionService(db, meal_plan_generator=must_not_generate).ensure_daily_meal_plan(
+            user_id, current_date=current
+        )
+        db.commit()
+        analysis = json.loads(db.query(UserProfileDB).filter_by(user_id=user_id).one().analysis_result)
+
+    assert result["changed"] is False
+    assert analysis["meal_plan_date"] == "2026-09-15"
+    assert analysis["meal_plan"][0]["items"][0]["nama"] == "Menu lama"
+
+
+def test_daily_check_replaces_plan_only_once_on_next_day(db_session_factory):
+    user_id = _seed(db_session_factory)
+    first_day = date(2026, 9, 15)
+    calls = []
+
+    def generate(**kwargs):
+        calls.append(kwargs)
+        return ([{"waktu": "Pagi", "items": [{"nama": f"Menu harian {len(calls)}"}]}], {})
+
+    with db_session_factory() as db:
+        service = UserProgramActionService(db, meal_plan_generator=generate)
+        service.ensure_daily_meal_plan(user_id, current_date=first_day)
+        service.ensure_daily_meal_plan(user_id, current_date=first_day + timedelta(days=1))
+        repeated = service.ensure_daily_meal_plan(user_id, current_date=first_day + timedelta(days=1))
+        db.commit()
+        analysis = json.loads(db.query(UserProfileDB).filter_by(user_id=user_id).one().analysis_result)
+
+    assert len(calls) == 1
+    assert repeated["changed"] is False
+    assert analysis["meal_plan_date"] == "2026-09-16"
+    assert analysis["meal_plan"][0]["items"][0]["nama"] == "Menu harian 1"

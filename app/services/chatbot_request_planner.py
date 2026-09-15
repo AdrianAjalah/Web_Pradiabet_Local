@@ -6,11 +6,59 @@ from typing import Any
 
 
 class DeterministicRequestPlanner:
+    @staticmethod
+    def _meal_total_plan(q: str) -> dict[str, Any] | None:
+        """Parse explicit food-total questions without asking an LLM."""
+        if "total" not in q or not re.search(r"\b(?:kalori|nutrisi)\b", q):
+            return None
+
+        body = ""
+        prefix = re.match(
+            r"^(?:berapa\s+)?total\s+(?:kalori|nutrisi)(?:nya)?\s+(?:dari\s+)?(.+)$",
+            q,
+        )
+        action = re.match(
+            r"^.*?\b(?:makan|konsumsi)\b\s+(.+?)\s+berapa\s+total\s+(?:kalori|nutrisi)\b.*$",
+            q,
+        )
+        suffix = re.match(
+            r"^(.+?)\s+(?:berapa\s+)?total\s+(?:kalori|nutrisi)(?:nya)?(?:\s+berapa)?$",
+            q,
+        )
+        if prefix:
+            body = prefix.group(1)
+        elif action:
+            body = action.group(1)
+        elif suffix:
+            body = suffix.group(1)
+        else:
+            return None
+
+        body = re.sub(r"^(?:yang\s+)?(?:saya\s+)?(?:makan|konsumsi)\s+(?:dari\s+)?", "", body)
+        body = re.sub(r"\s+yang\s+saya\s+(?:makan|konsumsi)\s*$", "", body)
+        names = [
+            part.strip(" ,.")
+            for part in re.split(r"\s+(?:dan|serta|sama|dengan)\s+|\s*[,+]\s*", body)
+            if part.strip(" ,.")
+        ]
+        if not names or any(name in {"saya", "hari ini", "saya hari ini"} for name in names):
+            return None
+        return {"intent": "meal_total", "items": [{"food_name": name, "quantity": 1} for name in names[:8]]}
+
     def fast_plan(self, question: str) -> dict[str, Any] | None:
         """Only bypass the model for explicit, self-contained requests."""
         q = self._clean(question)
         if q in self.GREETINGS:
             return {"intent": "greeting"}
+        # Total makanan adalah operasi terstruktur. Parse di backend agar nama
+        # makanan dan aritmetika tidak pernah bergantung pada model bahasa.
+        total_plan = self._meal_total_plan(q)
+        if total_plan:
+            return total_plan
+        if "bandingkan" in q or re.search(r"\blebih (?:baik|sehat)\b", q):
+            comparison = self.plan(question)
+            if comparison.get("intent") == "compare_foods" and len(comparison.get("food_names") or []) >= 2:
+                return comparison
         # Pronouns, quantities and compound requests need contextual planning.
         if re.search(r"\b(itu|ini|tadi|tersebut|saya|dan|atau|serta|dengan|darah|normal|harian|kebutuhan|maksimal|minimal)\b|\d", q):
             return None
@@ -59,14 +107,11 @@ class DeterministicRequestPlanner:
             return {"intent": "pdf_education", "question": question}
         if "bandingkan" in q or re.search(r"\blebih (baik|sehat)\b", q):
             body = re.sub(r".*?(?:bandingkan|lebih baik|lebih sehat)\s+", "", q)
-            names = [part.strip() for part in re.split(r"\s+(?:dan|atau|dengan)\s+", body) if part.strip()]
+            names = [part.strip() for part in re.split(r"\s+(?:dan|atau|dengan|sama)\s+", body) if part.strip()]
             return {"intent": "compare_foods", "food_names": names[:3]}
-        if "total" in q and ("makan" in q or "konsumsi" in q):
-            body = re.sub(r"^.*?\b(?:makan|konsumsi)\b\s*", "", q)
-            body = re.sub(r"\bberapa\b.*$", "", body)
-            body = re.sub(r"\btotal\b.*$", "", body)
-            names = [part.strip(" ,.") for part in re.split(r"\s+(?:dan|serta)\s+|\s*,\s*", body) if part.strip(" ,.")]
-            return {"intent": "meal_total", "items": [{"food_name": name, "quantity": 1} for name in names[:8]]}
+        total_plan = self._meal_total_plan(q)
+        if total_plan:
+            return total_plan
         if re.search(r"\b(cari|rekomendasi|rekomendasikan|pilihkan)\b", q):
             intent = "recommend_foods" if re.search(r"\b(rekomendasi|rekomendasikan|pilihkan)\b", q) else "food_filter"
             plan: dict[str, Any] = {"intent": intent, "limit": 5}

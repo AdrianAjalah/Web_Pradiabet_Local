@@ -22,3 +22,30 @@ def test_multi_food_total_extracts_two_items():
     plan = DeterministicRequestPlanner().plan("saya makan nasi goreng dan bubur ayam berapa total kalori saya")
     assert plan["intent"] == "meal_total"
     assert [item["food_name"] for item in plan["items"]] == ["nasi goreng", "bubur ayam"]
+
+
+def test_multi_food_total_uses_fast_deterministic_plan():
+    planner = DeterministicRequestPlanner()
+    plan = planner.fast_plan("semisalnya saya makan sate ayam dan sate padang berapa total kalori yang saya makan")
+    assert plan is not None
+    assert plan["intent"] == "meal_total"
+    assert [item["food_name"] for item in plan["items"]] == ["sate ayam", "sate padang"]
+
+
+def test_total_calories_without_makan_keyword_and_with_sama():
+    plan = DeterministicRequestPlanner().fast_plan("berapa total kalori rasbi sama domba panggang")
+    assert plan == {
+        "intent": "meal_total",
+        "items": [
+            {"food_name": "rasbi", "quantity": 1},
+            {"food_name": "domba panggang", "quantity": 1},
+        ],
+    }
+
+
+def test_comparison_with_sama_uses_fast_deterministic_plan():
+    plan = DeterministicRequestPlanner().fast_plan("bandingkan rasbi sama domba panggang")
+    assert plan == {
+        "intent": "compare_foods",
+        "food_names": ["rasbi", "domba panggang"],
+    }

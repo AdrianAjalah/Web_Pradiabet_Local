@@ -151,6 +151,7 @@ def load_tracker_foods(force_reload: bool = False) -> list[dict[str, Any]]:
                     str(row.get("slot_meal_plan") or ""),
                 ]).lower(),
             }
+            food["missing_nutrients"] = [key for key in ("gula_g", "natrium_mg", "lemak_g", "protein_g", "karbohidrat_g") if safe_float(row.get(key), None) is None]
             reasons = recommendation_reasons(food)
             food["is_recommended"] = len(reasons) == 0
             food["recommendation_label"] = "Rekomendasi meal plan" if food["is_recommended"] else "Tidak direkomendasi"
@@ -230,6 +231,7 @@ def load_nutrition_foods(force_reload: bool = False) -> list[dict[str, Any]]:
                     str(row.get("slot_meal_plan") or ""),
                 ]).lower(),
             }
+            food["missing_nutrients"] = [key for key in ("gula_g", "natrium_mg", "lemak_g", "protein_g", "karbohidrat_g") if safe_float(row.get(key), None) is None]
             reasons = recommendation_reasons(food)
             food["is_recommended"] = len(reasons) == 0
             food["recommendation_label"] = "Rekomendasi meal plan" if food["is_recommended"] else "Tidak direkomendasi"
@@ -262,6 +264,12 @@ def food_public_payload(food: dict[str, Any]) -> dict[str, Any]:
         "not_recommended_reasons": food.get("not_recommended_reasons") or [],
         "is_ultra_processed": str(food.get("tingkat_proses") or "").lower() == "ultraproses",
         "is_fruit": is_fruit(food),
+        "missing_nutrients": food.get("missing_nutrients", []),
+        "jenis_bahan_utama": food.get("jenis_bahan_utama"),
+        **{key: food.get(key) for key in (
+            "mengandung_seafood", "mengandung_kacang", "mengandung_susu",
+            "mengandung_telur", "mengandung_babi", "mengandung_alkohol", "adalah_gorengan",
+        )},
     }
 
 

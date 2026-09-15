@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from app.core.config import Settings
 
 
 def safe_float(value: Any, default: Optional[float] = 0.0) -> Optional[float]:
@@ -35,7 +38,10 @@ def json_loads(value: Any, fallback: Any) -> Any:
 
 
 def today() -> date:
-    return date.today()
+    try:
+        return datetime.now(ZoneInfo(Settings().app_timezone)).date()
+    except ZoneInfoNotFoundError:
+        return date.today()
 
 
 def monday_of_week(d: date) -> date:
